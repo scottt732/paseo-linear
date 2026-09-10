@@ -199,7 +199,9 @@ function BoardColumn({
 }) {
   const styles = useMemo(
     () => ({
-      column: { width: columnWidth, height: "100%" as const, marginRight: 12 },
+      // No explicit height: the horizontal ScrollView's content container defaults to
+      // alignItems "stretch", so each column fills the bounded height of the board.
+      column: { width: columnWidth, marginRight: 12 },
       header: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, paddingBottom: 8 },
       dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: column.color },
       name: { color: theme.colors.foreground, fontSize: 13, fontWeight: "600" as const, flexShrink: 1 },
@@ -271,9 +273,12 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
       muted: { color: theme.colors.foregroundMuted, fontSize: 13 },
       error: { color: theme.colors.statusDanger, fontSize: 13 },
       empty: { color: theme.colors.foregroundMuted, fontSize: 13, paddingVertical: 16, textAlign: "center" as const },
+      // The board is the vertical extent: flex 1 bounds the ScrollView, and its content
+      // container stretches the columns to that height. A percentage-height chain here
+      // collapses when any ancestor is unbounded, so keep this flex-based.
       boardWrap: { flex: 1, minHeight: 0 },
-      board: { flexGrow: 0, height: "100%" as const },
-      boardContent: { flexDirection: "row" as const, height: "100%" as const, paddingBottom: 8 },
+      board: { flex: 1 },
+      boardContent: { flexDirection: "row" as const, paddingBottom: 8 },
       start: { color: theme.colors.accent, fontSize: 13, paddingVertical: 8 },
     }),
     [theme, layout.compact],
