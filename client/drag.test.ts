@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnAtPoint, resolveTargetStateId } from "./drag";
+import { columnAtPoint, dropEffect, resolveTargetStateId } from "./drag";
 
 const columns = [
   { name: "Backlog", x: 0, width: 100 },
@@ -58,5 +58,27 @@ describe("resolveTargetStateId", () => {
 
   it("does not match as a substring", () => {
     expect(resolveTargetStateId(states, "Progress")).toBeNull();
+  });
+});
+
+describe("dropEffect", () => {
+  it("is move when target is non-null and differs from origin", () => {
+    expect(dropEffect("Done", "Backlog")).toBe("move");
+  });
+
+  it("is none when target is null", () => {
+    expect(dropEffect(null, "Backlog")).toBe("none");
+  });
+
+  it("is none when target equals origin", () => {
+    expect(dropEffect("Backlog", "Backlog")).toBe("none");
+  });
+
+  it("is none when origin is null", () => {
+    expect(dropEffect("Backlog", null)).toBe("none");
+  });
+
+  it("is none when both target and origin are null", () => {
+    expect(dropEffect(null, null)).toBe("none");
   });
 });

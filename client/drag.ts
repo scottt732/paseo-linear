@@ -22,6 +22,17 @@ export function columnAtPoint(columns: DragColumnRect[], x: number): string | nu
   return null;
 }
 
+export type DropEffect = "move" | "none";
+
+/**
+ * What dropping on `target` would do, given the column the card came from.
+ * Dropping outside every column, or back on the origin column, does nothing.
+ */
+export function dropEffect(target: string | null, origin: string | null): DropEffect {
+  if (target === null || origin === null) return "none";
+  return target !== origin ? "move" : "none";
+}
+
 /**
  * Finds the state id whose name exactly matches a board column's name.
  * Matching is exact - never case-insensitive or a substring match - because
