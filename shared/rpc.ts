@@ -19,8 +19,22 @@ export const getIssueRpc = defineRpc({
 
 export const listIssuesRpc = defineRpc({
   name: "issues.list",
-  input: z.object({ scope: z.enum(["assigned", "cycle", "triage"]) }),
+  input: z.object({ scope: z.enum(["assigned", "cycle", "triage", "unassigned"]) }),
   output: z.object({ issues: z.array(IssueSchema) }),
+});
+
+export const createIssueRpc = defineRpc({
+  name: "linear.create-issue",
+  input: z.object({
+    title: z.string().min(1),
+    teamId: z.string(),
+    stateId: z.string().optional(),
+    assigneeId: z.string().optional(),
+    priority: z.number().optional(),
+    dueDate: z.string().optional(),
+    description: z.string().optional(),
+  }),
+  output: z.object({ identifier: z.string(), url: z.url(), id: z.string() }),
 });
 
 export const verifyRpc = defineRpc({
