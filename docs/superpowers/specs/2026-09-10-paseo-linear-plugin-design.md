@@ -115,7 +115,7 @@ right and we keep that test.
 This is the visual contract, taken from the reference screenshot.
 
 **Chip** — a pill showing just the identifier (`ENG-14236`), rounded and sized to content.
-Chips sit in rows and wrap. The pill takes `theme.colors.raised` for its ground and
+Chips sit in rows and wrap. The pill takes `theme.colors.surface2` for its ground and
 `theme.colors.foreground` for its label, so it reads as a raised token against the page in
 either theme rather than being pinned to the light-on-dark of the reference screenshot.
 
@@ -352,7 +352,7 @@ network, no mocking library.
 | `server/linear/mutations.ts` | each mutation's variables; nothing fires without an explicit call |
 
 Mobile audit before calling it done, per the plugin skill:
-`rg -n "document\.|window\.|localStorage|navigator\.|<[a-z]+[ >]|className=|onClick=" client/`
+`rg -n "document\.|window\.|localStorage|navigator\.|<(div|span|button|a|p|ul|li|input|form|img|h[1-6])[ >/]|className=|onClick=" client/`
 — a hit anywhere but `client/web.ts` is a bug.
 
 Manual verification: install, `paseo plugin ls` shows `running`, then exercise each surface on

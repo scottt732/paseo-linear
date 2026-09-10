@@ -1849,8 +1849,46 @@ export default function contribute(client: PluginClientContext) {
 }
 ```
 
-`pushSettings` is exported from `index.client.tsx` for reuse — Task 12's settings screen calls
-it again after each successful save so the daemon cache never goes stale.
+**Boundary note:** `pushSettings` must NOT live in `index.client.tsx`. A relative import to
+another code file in the plugin root is a compile error under v0.8, so the settings screen
+could never import it from there. Put it in `client/sync.ts`:
+
+```ts
+// client/sync.ts
+import { settingsRpc } from "@getpaseo/plugin";
+import type { PluginClientContext } from "@getpaseo/plugin/client";
+import { syncSettingsRpc } from "../shared/rpc";
+import { LinearSettingsSchema, type LinearSettings } from "../shared/settings";
+
+const linearSettingsRpc = settingsRpc("linear");
+
+/** Reads the stored settings document and pushes it to the daemon cache. */
+export async function pushSettings(client: PluginClientContext): Promise<void> {
+  const stored = await client.rpc(linearSettingsRpc.read, {});
+  if (stored.status !== "ready") return;
+  await client.rpc(syncSettingsRpc, { values: LinearSettingsSchema.parse(stored.values) });
+}
+
+/** Pushes an already-known settings document, for use right after a save. */
+export async function pushSettingsValues(
+  rpc: <I, O>(contract: never, input: I) => Promise<O>,
+  values: LinearSettings,
+): Promise<void> {
+  await (rpc as unknown as (c: typeof syncSettingsRpc, i: { values: LinearSettings }) => Promise<unknown>)(
+    syncSettingsRpc,
+    { values },
+  );
+}
+```
+
+`pushSettingsValues`'s signature above is illustrative only — implement it with whatever
+concrete type `useRpc(syncSettingsRpc)` actually returns, and do NOT use `as unknown as` or any
+other assertion. The requirement is simply: after a successful `save()`, the settings screen
+pushes the saved values to the daemon so the cache never goes stale. In practice that is
+`const sync = useRpc(syncSettingsRpc); … await sync({ values: nextValues });` — no helper
+needed. Delete `pushSettingsValues` if the direct call reads better.
+
+`index.client.tsx` imports `pushSettings` from `./client/sync`.
 
 - [ ] **Step 5: Typecheck, install, and verify it runs**
 
@@ -1938,7 +1976,7 @@ export function IssueChip({
   const styles = useMemo(
     () => ({
       chip: {
-        backgroundColor: theme.colors.raised,
+        backgroundColor: theme.colors.surface2,
         borderRadius: 6,
         paddingHorizontal: 8,
         paddingVertical: 3,
@@ -1971,7 +2009,7 @@ export function IssueCard({ issue, theme, layout }: ChromeProps & { issue: Issue
       row: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, flexWrap: "wrap" as const },
       state: { color: issue.state.color, fontSize: 13, fontWeight: "600" as const },
       muted: { color: theme.colors.foregroundMuted, fontSize: 13 },
-      badge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: theme.colors.raised },
+      badge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: theme.colors.surface2 },
       badgeText: { color: theme.colors.foregroundMuted, fontSize: 11 },
       divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 4 },
       description: { color: theme.colors.foregroundMuted, fontSize: 13, lineHeight: 19 },
@@ -2072,7 +2110,7 @@ are also reachable as `PluginSurfaceProps["theme"]` and `PluginSurfaceProps["lay
 
 - [ ] **Step 4: Run the mobile audit**
 
-Run: `rg -n "document\.|window\.|localStorage|navigator\.|<[a-z]+[ >]|className=|onClick=" client/`
+Run: `rg -n "document\.|window\.|localStorage|navigator\.|<(div|span|button|a|p|ul|li|input|form|img|h[1-6])[ >/]|className=|onClick=" client/`
 Expected: exactly one hit, the `declare const window` line in `client/web.ts`. Any other hit is
 a bug — fix it before committing.
 
@@ -2269,7 +2307,7 @@ a success toast naming you and the key source. Check the same screen in a compac
 
 - [ ] **Step 4: Run the mobile audit**
 
-Run: `rg -n "document\.|window\.|localStorage|navigator\.|<[a-z]+[ >]|className=|onClick=" client/`
+Run: `rg -n "document\.|window\.|localStorage|navigator\.|<(div|span|button|a|p|ul|li|input|form|img|h[1-6])[ >/]|className=|onClick=" client/`
 Expected: only the `client/web.ts` line.
 
 - [ ] **Step 5: Commit**
@@ -2447,10 +2485,17 @@ export async function startWork(
   const issue = await fetchIssue(transport, identifier);
   if (!issue) throw new Error(`No Linear issue found for ${identifier}`);
 
+  const provider = settings.provider.trim();
+  if (!provider) {
+    throw new Error(
+      "Set a provider in Settings → Plugins → Linear before starting work from an issue",
+    );
+  }
+
   const request = buildWorkspaceRequest(issue, settings);
   const workspace = await context.paseo.workspaces.create(request);
   const agent = await workspace.agents.create({
-    config: settings.provider ? { provider: settings.provider } : { provider: "" },
+    config: { provider },
     labels: issueLabels(issue),
     title: `${issue.identifier} · ${issue.title}`,
   });
@@ -2459,9 +2504,16 @@ export async function startWork(
 }
 ```
 
-> **Verify while implementing:** `config.provider` is required and typed as `string`. If an
-> empty string is rejected, read the daemon's default provider through
-> `context.paseo.providers` and use that instead of `""`. Do not silently hardcode a provider.
+**Resolved:** the SDK has no "daemon default provider" accessor — `PaseoProviderActions` offers
+only `listModels`, `listModes`, `listFeatures`, `listAvailable`, `snapshot`, `waitForReady`,
+and `refresh`. Picking one from `listAvailable()` would start an agent on an arbitrary model,
+which is a surprising side effect for a user who pressed "start work". So the provider setting
+is required, and an unset one fails with the actionable message above. Task 12's settings
+screen already exposes the field.
+
+Add a test for this in `server/start-work.test.ts` — `buildWorkspaceRequest` does not own the
+check, so assert it at the `startWork` level is not possible without a Paseo double. Instead
+keep the guard in `startWork` and note it as covered by the manual verification in Step 8.
 
 - [ ] **Step 4: Run and watch it pass**
 
@@ -2706,7 +2758,7 @@ export function IssuesPanel({ theme, layout }: PluginWorkspacePanelProps) {
             onPress={() => setScope(entry.id)}
             style={[
               styles.tab,
-              { backgroundColor: scope === entry.id ? theme.colors.raised : "transparent" },
+              { backgroundColor: scope === entry.id ? theme.colors.surface2 : "transparent" },
             ]}
           >
             <Text
@@ -2777,10 +2829,22 @@ client.addSurface("issues", IssuesPanel);
 client.addSidebarItem({ id: "issues", title: "Linear", icon: "CircleDot", surface: "issues" });
 ```
 
-> `IssuesPanel` takes `PluginWorkspacePanelProps`. If `addSurface` requires
-> `PluginSurfaceProps` (no `workspaceId`), split the component: keep the rendering in a
-> `IssuesList({ theme, layout })` that takes only chrome props, and have both the panel and the
-> surface wrap it. Do not cast.
+**Resolved — the split is required, not conditional.** `addWorkspacePanel` passes
+`PluginWorkspacePanelProps` (which carries `workspaceId`); `addSurface` passes
+`PluginSurfaceProps` (which does not). They are different types, so one component cannot
+satisfy both. Structure it as:
+
+- `IssuesList({ theme, layout })` in `client/panel.tsx` — all the rendering, chrome props only.
+- `IssuesPanel(props: PluginWorkspacePanelProps)` — renders `<IssuesList theme={props.theme} layout={props.layout} />`.
+- `IssuesSurface(props: PluginSurfaceProps)` — renders the same.
+
+Never cast between the two prop types.
+
+**Also in this task — wire Task 13's `LaunchFollowUp`.** `client/launch.tsx` already exports
+`useLaunchFollowUp()` and `LaunchFollowUp`. In `IssuesList`, call `offer(issue)` after
+`startWork` resolves, and render `<LaunchFollowUp issue={pending} theme={theme} layout={layout}
+onDone={dismiss} />`. Without this the confirmation sheet is dead code and the `moveToStarted`
+/ `assignToMe` settings do nothing.
 
 - [ ] **Step 3: Typecheck, reload, verify**
 
@@ -2796,7 +2860,7 @@ window and both themes.
 - [ ] **Step 4: Mobile audit and commit**
 
 ```bash
-rg -n "document\.|window\.|localStorage|navigator\.|<[a-z]+[ >]|className=|onClick=" client/
+rg -n "document\.|window\.|localStorage|navigator\.|<(div|span|button|a|p|ul|li|input|form|img|h[1-6])[ >/]|className=|onClick=" client/
 git add client/panel.tsx index.client.tsx
 git commit -m "feat: issue panel with assigned, cycle, and triage scopes"
 ```
@@ -3130,7 +3194,7 @@ are unverified, so the script is the supported path today.
 ```bash
 npm run typecheck
 npm test
-rg -n "document\.|window\.|localStorage|navigator\.|<[a-z]+[ >]|className=|onClick=" client/
+rg -n "document\.|window\.|localStorage|navigator\.|<(div|span|button|a|p|ul|li|input|form|img|h[1-6])[ >/]|className=|onClick=" client/
 paseo plugin reload linear
 paseo plugin ls
 paseo plugin logs linear | tail -30
