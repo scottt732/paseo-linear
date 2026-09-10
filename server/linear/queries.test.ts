@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 import type { LinearTransport } from "./client";
-import { fetchIssue, listIssues, searchIssues, toIssue } from "./queries";
+import { countPullRequests, fetchIssue, listIssues, searchIssues, toIssue } from "./queries";
 
 const rawIssue = {
   id: "uuid-1",
@@ -11,14 +11,18 @@ const rawIssue = {
   url: "https://linear.app/thecosmos/issue/ENG-14236/randomize",
   branchName: "feature/eng-14236-randomize",
   priorityLabel: "No priority",
+  priority: 0,
+  estimate: null,
+  dueDate: null,
   createdAt: "2026-09-09T14:40:17.035Z",
   updatedAt: "2026-09-10T03:00:44.419Z",
-  state: { id: "s1", name: "In Progress", type: "started", color: "#f2c94c" },
+  state: { id: "s1", name: "In Progress", type: "started", color: "#f2c94c", position: 956.71 },
   team: { id: "t1", key: "ENG", name: "Engineering" },
   assignee: { id: "u1", name: "Stephanos Tsoucas" },
   project: { id: "p1", name: "Shopping", icon: "🎁", color: "#5e6ad2" },
   parent: { identifier: "ENG-14095", title: "Shop Tab", parent: null },
   labels: { nodes: [{ name: "Backend", color: "#bb87fc" }] },
+  attachments: { nodes: [] },
 };
 
 function stubTransport(handler: (query: string, variables: Record<string, unknown>) => unknown): {
@@ -51,6 +55,35 @@ describe("toIssue", () => {
   });
   it("flattens label nodes", () => {
     expect(toIssue(rawIssue).labels).toEqual([{ name: "Backend", color: "#bb87fc" }]);
+  });
+  it("derives prCount from attachment urls", () => {
+    const withPr = {
+      ...rawIssue,
+      attachments: { nodes: [{ url: "https://github.com/acme/repo/pull/42" }] },
+    };
+    expect(toIssue(withPr).prCount).toBe(1);
+  });
+});
+
+describe("countPullRequests", () => {
+  it("counts a GitHub pull request URL", () => {
+    expect(countPullRequests(["https://github.com/acme/repo/pull/42"])).toBe(1);
+  });
+  it("counts a GitLab merge request URL", () => {
+    expect(countPullRequests(["https://gitlab.com/acme/repo/-/merge_requests/7"])).toBe(1);
+  });
+  it("does not count a plain issue URL", () => {
+    expect(countPullRequests(["https://github.com/acme/repo/issues/9"])).toBe(0);
+  });
+  it("does not count a document URL", () => {
+    expect(countPullRequests(["https://linear.app/thecosmos/document/abc"])).toBe(0);
+  });
+  it("returns 0 for an empty list", () => {
+    expect(countPullRequests([])).toBe(0);
+  });
+  it("counts duplicates each without deduping", () => {
+    const url = "https://github.com/acme/repo/pull/42";
+    expect(countPullRequests([url, url])).toBe(2);
   });
 });
 
@@ -105,5 +138,13 @@ describe("listIssues", () => {
     const { transport, calls } = stubTransport(() => ({ issues: { nodes: [] } }));
     await listIssues(transport, "triage", "");
     expect(calls[0].variables.filter).toMatchObject({ state: { type: { eq: "triage" } } });
+  });
+  it("scopes unassigned issues to no assignee and an open state", async () => {
+    const { transport, calls } = stubTransport(() => ({ issues: { nodes: [] } }));
+    await listIssues(transport, "unassigned", "");
+    expect(calls[0].variables.filter).toMatchObject({
+      assignee: { null: true },
+      state: { type: { nin: ["completed", "canceled"] } },
+    });
   });
 });

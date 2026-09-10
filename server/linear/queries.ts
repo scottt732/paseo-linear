@@ -3,13 +3,14 @@ import { type Issue, IssueSchema } from "../../shared/issue";
 import type { LinearTransport } from "./client";
 
 export const ISSUE_FIELDS = `
-  id identifier title description url branchName priorityLabel createdAt updatedAt
-  state { id name type color }
+  id identifier title description url branchName priorityLabel priority estimate dueDate createdAt updatedAt
+  state { id name type color position }
   team { id key name }
   assignee { id name }
   project { id name icon color }
   parent { identifier title parent { identifier title parent { identifier title } } }
   labels { nodes { name color } }
+  attachments { nodes { url } }
 `;
 
 const ParentSchema: z.ZodType<{ identifier: string; title: string; parent?: unknown } | null> =
@@ -27,9 +28,18 @@ const RawIssueSchema = z.object({
   url: z.string(),
   branchName: z.string(),
   priorityLabel: z.string(),
+  priority: z.number(),
+  estimate: z.number().nullable(),
+  dueDate: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  state: z.object({ id: z.string(), name: z.string(), type: z.string(), color: z.string() }),
+  state: z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.string(),
+    color: z.string(),
+    position: z.number(),
+  }),
   team: z.object({ id: z.string(), key: z.string(), name: z.string() }),
   assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
   project: z
@@ -42,6 +52,7 @@ const RawIssueSchema = z.object({
     .nullable(),
   parent: ParentSchema.optional(),
   labels: z.object({ nodes: z.array(z.object({ name: z.string(), color: z.string() })) }),
+  attachments: z.object({ nodes: z.array(z.object({ url: z.string() })) }),
 });
 
 const SingleIssueSchema = z.object({ issue: RawIssueSchema.nullable() });
@@ -83,12 +94,19 @@ function flattenParents(parent: unknown): Array<{ identifier: string; title: str
   return chain;
 }
 
+const PULL_REQUEST_URL = /\/(?:pull|merge_requests)\/\d+(?:[/?#]|$)/;
+
+export function countPullRequests(urls: string[]): number {
+  return urls.filter((url) => PULL_REQUEST_URL.test(url)).length;
+}
+
 export function toIssue(raw: unknown): Issue {
   const parsed = RawIssueSchema.parse(raw);
   return IssueSchema.parse({
     ...parsed,
     parents: flattenParents(parsed.parent),
     labels: parsed.labels.nodes,
+    prCount: countPullRequests(parsed.attachments.nodes.map((node) => node.url)),
   });
 }
 
@@ -123,12 +141,13 @@ export async function searchIssues(
   return data.issues.nodes.map(toIssue);
 }
 
-export type IssueScope = "assigned" | "cycle" | "triage";
+export type IssueScope = "assigned" | "cycle" | "triage" | "unassigned";
 
 const SCOPE_FILTERS: Record<IssueScope, Record<string, unknown>> = {
   assigned: { assignee: { isMe: { eq: true } }, state: { type: { nin: ["completed", "canceled"] } } },
   cycle: { cycle: { isActive: { eq: true } } },
   triage: { state: { type: { eq: "triage" } } },
+  unassigned: { assignee: { null: true }, state: { type: { nin: ["completed", "canceled"] } } },
 };
 
 export async function listIssues(

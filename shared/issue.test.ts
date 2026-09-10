@@ -9,14 +9,18 @@ const issue: Issue = {
   url: "https://linear.app/thecosmos/issue/ENG-14236/randomize",
   branchName: "feature/eng-14236-randomize",
   priorityLabel: "No priority",
+  priority: 0,
+  estimate: null,
+  dueDate: null,
   createdAt: "2026-09-09T14:40:17.035Z",
   updatedAt: "2026-09-10T03:00:44.419Z",
-  state: { id: "s1", name: "In Progress", type: "started", color: "#f2c94c" },
+  state: { id: "s1", name: "In Progress", type: "started", color: "#f2c94c", position: 956.71 },
   team: { id: "t1", key: "ENG", name: "Engineering" },
   assignee: { id: "u1", name: "Stephanos Tsoucas" },
   project: { id: "p1", name: "Shopping", icon: "🎁", color: "#5e6ad2" },
   parents: [{ identifier: "ENG-14095", title: "Shop Tab" }],
   labels: [{ name: "Backend", color: "#bb87fc" }],
+  prCount: 0,
 };
 
 describe("IssueSchema", () => {

@@ -10,9 +10,18 @@ export const IssueSchema = z.object({
   url: z.url(),
   branchName: z.string(),
   priorityLabel: z.string(),
+  priority: z.number(),
+  estimate: z.number().nullable(),
+  dueDate: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  state: z.object({ id: z.string(), name: z.string(), type: z.string(), color: z.string() }),
+  state: z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.string(),
+    color: z.string(),
+    position: z.number(),
+  }),
   team: z.object({ id: z.string(), key: z.string(), name: z.string() }),
   assignee: RefSchema.nullable(),
   project: z
@@ -20,6 +29,7 @@ export const IssueSchema = z.object({
     .nullable(),
   parents: z.array(z.object({ identifier: z.string(), title: z.string() })),
   labels: z.array(z.object({ name: z.string(), color: z.string() })),
+  prCount: z.number(),
 });
 
 export type Issue = z.infer<typeof IssueSchema>;
