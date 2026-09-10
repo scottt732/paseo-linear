@@ -7,7 +7,7 @@ import { Animated, PanResponder, Pressable, Text, View } from "react-native";
 import { relativeTime } from "../shared/format";
 import type { Issue } from "../shared/issue";
 import { listIssuesRpc, listStatesRpc, moveStateRpc, startWorkRpc } from "../shared/rpc";
-import { columnAtPoint, resolveTargetStateId } from "./drag";
+import { type DropEffect, columnAtPoint, dropEffect, resolveTargetStateId } from "./drag";
 import { LinearLogo } from "./logo";
 import { CreateIssueModal } from "./create-issue";
 import { IssueCard } from "./chip";
@@ -225,7 +225,7 @@ function BoardCard({
   isDimmed: boolean;
   onOpenIssue(issue: Issue): void;
   onLift(issue: Issue, layout: CardLayout): void;
-  onDragMove(dx: number, dy: number): void;
+  onDragMove(dx: number, dy: number, moveX: number, moveY: number): void;
   onDrop(moveX: number, moveY: number): void;
   onCancelDrag(): void;
 }) {
@@ -262,7 +262,7 @@ function BoardCard({
           }
           return;
         }
-        callbacksRef.current.onDragMove(gestureState.dx, gestureState.dy);
+        callbacksRef.current.onDragMove(gestureState.dx, gestureState.dy, gestureState.moveX, gestureState.moveY);
       },
       onPanResponderRelease: (_event, gestureState) => {
         if (timerRef.current !== null) {
@@ -313,12 +313,14 @@ function FloatingCard({
   now,
   position,
   width,
+  effect,
 }: {
   issue: Issue;
   theme: PluginTheme;
   now: Date;
   position: Animated.ValueXY;
   width: number;
+  effect: DropEffect;
 }) {
   const styles = useCardStyles(theme);
   return (
@@ -332,7 +334,7 @@ function FloatingCard({
           top: position.y,
           width,
           marginBottom: 0,
-          opacity: 0.9,
+          opacity: effect === "move" ? 0.9 : 0.5,
           transform: [{ scale: 1.03 }],
         },
       ]}
@@ -349,6 +351,7 @@ function BoardColumn({
   now,
   isRefreshing,
   isDragging,
+  isDropTarget,
   liftedIssueId,
   onRefresh,
   onOpenIssue,
@@ -365,12 +368,13 @@ function BoardColumn({
   now: Date;
   isRefreshing: boolean;
   isDragging: boolean;
+  isDropTarget: boolean;
   liftedIssueId: string | null;
   onRefresh(): void;
   onOpenIssue(issue: Issue): void;
   onCreate(): void;
   onLift(issue: Issue, layout: CardLayout): void;
-  onDragMove(dx: number, dy: number): void;
+  onDragMove(dx: number, dy: number, moveX: number, moveY: number): void;
   onDrop(moveX: number, moveY: number): void;
   onCancelDrag(): void;
   registerColumnRef(name: string, node: View | null): void;
@@ -379,7 +383,20 @@ function BoardColumn({
     () => ({
       // No explicit height: the horizontal ScrollView's content container defaults to
       // alignItems "stretch", so each column fills the bounded height of the board.
-      column: { width: columnWidth, marginRight: 12 },
+      // The border is always present (transparent by default) and reserves the same
+      // 1px of space whether or not this column is the active drop target, so
+      // highlighting it never shifts the layout.
+      column: {
+        width: columnWidth,
+        marginRight: 12,
+        borderWidth: 1,
+        borderRadius: 8,
+        borderColor: "transparent",
+      },
+      columnActive: {
+        borderColor: theme.colors.accent,
+        backgroundColor: theme.colors.surface1,
+      },
       header: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, paddingBottom: 8 },
       dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: column.color },
       name: { color: theme.colors.foreground, fontSize: 13, fontWeight: "600" as const, flexShrink: 1 },
@@ -397,7 +414,7 @@ function BoardColumn({
   );
 
   return (
-    <View style={styles.column} ref={setColumnRef}>
+    <View style={[styles.column, isDropTarget ? styles.columnActive : null]} ref={setColumnRef}>
       <View style={styles.header}>
         <View style={styles.dot} />
         <Text style={styles.name} numberOfLines={1}>
@@ -441,6 +458,7 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
   const [createFor, setCreateFor] = useState<string | null>(null);
   const [liftedIssue, setLiftedIssue] = useState<Issue | null>(null);
   const [originColumn, setOriginColumn] = useState<string | null>(null);
+  const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const listIssues = useRpc(listIssuesRpc);
   const listStates = useRpc(listStatesRpc);
@@ -453,6 +471,7 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
   const boardWrapRef = useRef<View>(null);
   const columnRefs = useRef(new Map<string, View>());
   const columnRectsRef = useRef<Array<{ name: string; x: number; width: number }>>([]);
+  const hoveredColumnRef = useRef<string | null>(null);
   const cardOffsetRef = useRef({ x: 0, y: 0 });
   const cardSizeRef = useRef({ width: 0, height: 0 });
   const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -475,6 +494,7 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
   const columns = useMemo(() => buildColumns(effectiveIssues), [effectiveIssues]);
   const columnWidth = layout.compact ? 260 : 280;
   const isDragging = liftedIssue !== null;
+  const currentDropEffect = dropEffect(hoveredColumn, originColumn);
 
   const styles = useMemo(
     () => ({
@@ -513,6 +533,8 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
   function clearDrag() {
     setLiftedIssue(null);
     setOriginColumn(null);
+    hoveredColumnRef.current = null;
+    setHoveredColumn(null);
   }
 
   function onLift(issue: Issue, cardLayout: CardLayout) {
@@ -538,8 +560,16 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
     });
   }
 
-  function onDragMove(dx: number, dy: number) {
+  function onDragMove(dx: number, dy: number, moveX: number, moveY: number) {
     dragPosition.setValue({ x: cardOffsetRef.current.x + dx, y: cardOffsetRef.current.y + dy });
+    // columnAtPoint runs on every pointer move, so only touch state (and trigger a
+    // re-render) when the hovered column actually changes; a setState per move event
+    // would cause a re-render storm and make the drag feel laggy.
+    const target = columnAtPoint(columnRectsRef.current, moveX);
+    if (target !== hoveredColumnRef.current) {
+      hoveredColumnRef.current = target;
+      setHoveredColumn(target);
+    }
   }
 
   async function moveIssueToColumn(issue: Issue, targetColumnName: string) {
@@ -632,6 +662,7 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
                   now={now}
                   isRefreshing={query.isFetching}
                   isDragging={isDragging}
+                  isDropTarget={column.name === hoveredColumn && currentDropEffect === "move"}
                   liftedIssueId={liftedIssue?.id ?? null}
                   onRefresh={() => void query.refetch()}
                   onOpenIssue={setSelected}
@@ -651,6 +682,7 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
                 now={now}
                 position={dragPosition}
                 width={cardSizeRef.current.width}
+                effect={currentDropEffect}
               />
             ) : null}
           </View>
