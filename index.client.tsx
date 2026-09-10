@@ -1,4 +1,5 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
+import { IssuesPanel, IssuesSurface } from "./client/panel";
 import { LinearSettingsScreen } from "./client/settings";
 import { pushSettings } from "./client/sync";
 import { issueAttachments } from "./shared/attachments";
@@ -15,6 +16,17 @@ export default function contribute(client: PluginClientContext) {
   void pushSettings(client).catch(() => {
     // The settings screen pushes again on save; a cold read failure is not fatal.
   });
+
+  client.addWorkspacePanel({
+    id: "issues",
+    title: "Linear",
+    icon: "CircleDot",
+    context: "workspace",
+    locations: ["workspace", "explorer"],
+    Component: IssuesPanel,
+  });
+  client.addSurface("issues", IssuesSurface);
+  client.addSidebarItem({ id: "issues", title: "Linear", icon: "CircleDot", surface: "issues" });
 
   client.addCommandCenterItem({
     id: "start-work",
