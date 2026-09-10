@@ -20,6 +20,8 @@ describe("resolveApiKey", () => {
     );
   });
   it("throws an actionable error when neither is set", () => {
-    expect(() => resolveApiKey({}, { apiKey: "" })).toThrow("Settings → Plugins → Linear");
+    expect(() => resolveApiKey({}, { apiKey: "" })).toThrow(
+      "Set LINEAR_API_KEY in the daemon environment, or open Settings → Plugins → Linear and add a key",
+    );
   });
 });

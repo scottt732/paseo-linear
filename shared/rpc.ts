@@ -1,6 +1,7 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 import { AttachmentItemSchema, IssueSchema } from "./issue";
+import { LinearSettingsSchema } from "./settings";
 
 const IdentifierInput = z.object({ identifier: z.string() });
 
@@ -37,7 +38,7 @@ export const listStatesRpc = defineRpc({
 });
 
 export const startWorkRpc = defineRpc({
-  name: "linear.startWork",
+  name: "linear.start-work",
   input: IdentifierInput,
   output: z.object({ workspaceId: z.string(), agentId: z.string(), branchName: z.string() }),
 });
@@ -49,19 +50,25 @@ export const commentRpc = defineRpc({
 });
 
 export const moveStateRpc = defineRpc({
-  name: "linear.moveState",
+  name: "linear.move-state",
   input: z.object({ issueId: z.string(), stateId: z.string() }),
   output: z.object({ stateName: z.string() }),
 });
 
 export const assignSelfRpc = defineRpc({
-  name: "linear.assignSelf",
+  name: "linear.assign-self",
   input: z.object({ issueId: z.string() }),
   output: z.object({ assigneeName: z.string() }),
 });
 
 export const linkBranchRpc = defineRpc({
-  name: "linear.linkBranch",
+  name: "linear.link-branch",
   input: z.object({ issueId: z.string(), url: z.url(), title: z.string() }),
   output: z.object({ linked: z.boolean() }),
+});
+
+export const syncSettingsRpc = defineRpc({
+  name: "linear.sync-settings",
+  input: z.object({ values: LinearSettingsSchema }),
+  output: z.object({ ok: z.boolean() }),
 });

@@ -15,6 +15,6 @@ export function resolveApiKey(
   const fromSettings = settings.apiKey.trim();
   if (fromSettings) return { apiKey: fromSettings, source: "settings" };
   throw new LinearApiError(
-    "Add a Linear API key in Settings → Plugins → Linear, or set LINEAR_API_KEY in the daemon environment",
+    "Set LINEAR_API_KEY in the daemon environment, or open Settings → Plugins → Linear and add a key",
   );
 }
