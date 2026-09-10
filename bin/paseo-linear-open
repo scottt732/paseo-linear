@@ -1,0 +1,12 @@
+#!/bin/bash
+# Register this in Linear: Settings → Code & reviews → External tools → custom tool.
+# Linear passes the issue identifier as the first argument.
+set -euo pipefail
+
+identifier="${1:?usage: paseo-linear-open <ISSUE-IDENTIFIER>}"
+
+exec paseo run \
+  --background \
+  --title "$identifier" \
+  --label "linear.issue=$identifier" \
+  "Start work on Linear issue $identifier. Use the Linear plugin's issue context."
