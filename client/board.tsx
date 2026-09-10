@@ -598,7 +598,10 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
     const origin = originColumn;
     const targetName = columnAtPoint(columnRectsRef.current, moveX);
     clearDrag();
-    if (!issue || !origin || targetName === null || targetName === origin) return;
+    // The explicit null check narrows targetName for the call below; dropEffect owns
+    // the rest of the rule, so the highlight and the write can never disagree about
+    // what a drop does.
+    if (!issue || targetName === null || dropEffect(targetName, origin) === "none") return;
     void moveIssueToColumn(issue, targetName);
   }
 
