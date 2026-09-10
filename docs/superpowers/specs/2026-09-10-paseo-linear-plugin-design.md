@@ -236,14 +236,34 @@ Reachable three ways — Command Center item, `/linear ENG-14236` slash command,
 any panel row — all funnelling into one `linear.startWork` RPC.
 
 1. Fetch the issue, including `branchName`.
-2. Create the workspace:
-   `workspaces.create({ source: { kind: "worktree", cwd: repositoryPath, action: "branch_off", newBranch: issue.branchName, base: baseRef } })`.
-   **The exact discriminant is unverified** — see §11.
-3. Set the workspace title to `ENG-14236 · <title>`.
-4. Create the agent with the §7 labels, the configured provider, and the rendered prompt.
-5. If `moveToStarted` or `assignToMe` is on, show a confirm sheet listing exactly what will
+2. Create the workspace, seeding the first agent's context in the same call:
+
+```ts
+await paseo.workspaces.create({
+  title: `${issue.identifier} · ${issue.title}`,
+  source: {
+    kind: "worktree",
+    cwd: repositoryPath,
+    action: "branch-off",
+    branchName: issue.branchName,
+    baseBranch: baseRef,
+  },
+  firstAgentContext: {
+    prompt: renderPrompt(promptTemplate, issue),
+    attachments: [issueAttachment(issue)],
+  },
+});
+```
+
+3. Create the agent on that workspace handle with the §7 labels and the configured provider.
+4. If `moveToStarted` or `assignToMe` is on, show a confirm sheet listing exactly what will
    change in Linear, and mutate only on press. This mirrors Linear's own "on git branch copy,
    move issue to started status" behavior, which is opt-in there too.
+
+`firstAgentContext.attachments` accepts a text attachment carrying an `externalResource`
+(`{ provider, providerLabel, resourceType, id, identifier, title, url }`) — the same shape the
+attachment source in §8.1 produces. So the launched agent gets the issue as a real attachment
+pill, not just inlined prose, and §8.1 and §8.3 share one `issueAttachment(issue)` builder.
 
 `baseRef` defaults to `origin/main` rather than `main` deliberately: Paseo fetches remote refs
 in the background, so the remote-tracking ref is current while a local `main` is whatever was
@@ -331,22 +351,33 @@ Manual verification: install, `paseo plugin ls` shows `running`, then exercise e
 a wide desktop window and a compact one, in both a light and a dark theme, and watch a real
 turn end rather than only inspecting completed history.
 
-## 11. To verify against the installed types, not guessed
+## 11. Verified against the installed types
 
-Three things this spec asserts that the public docs do not pin down. Each is checked against
-`node_modules/@getpaseo/plugin` — which is authoritative and local — before the code that
-depends on it is written.
+Resolved by reading `node_modules/@getpaseo/client` and `@getpaseo/protocol` after install,
+rather than guessing from the public docs.
 
-1. **`workspaces.create({ source })` for branch-off.** The docs show the CLI form
-   (`--worktree-mode branch-off --new-branch --base`) and the SDK form only for PR checkout.
-   §8.3 assumes `action: "branch_off"` with `newBranch`/`base`. If the SDK shape differs, §8.3
-   changes; nothing else does.
-2. **Setting agent labels through `agents.create`.** The SDK lists `labels` among creation
-   options and `--label` exists on the CLI, but the accepted shape is unconfirmed. If labels
-   turn out not to be settable at creation, the fallback is the plugin settings document
-   (approach B from the earlier discussion), isolated behind `server/binding.ts`.
-3. **The `paseo://` URL scheme's routes.** Unknown. The CLI script route in §9 works
-   regardless, so this is an enhancement, not a dependency.
+1. **`workspaces.create({ source })` for branch-off — RESOLVED, and the earlier guess was
+   wrong.** `WorkspaceCreateRequestSchema.source` is a discriminated union on `kind`. The
+   worktree arm is:
+
+   ```ts
+   { kind: "worktree"; cwd?: string; projectId?: string;
+     action?: "branch-off" | "checkout";
+     refName?: string; baseBranch?: string; branchName?: string;
+     checkoutSource?: { kind: "change_request"; forge?: string; number: number; projectPath?: string };
+     githubPrNumber?: number; worktreeSlug?: string }
+   ```
+
+   So it is `action: "branch-off"` (hyphen), `branchName`, and `baseBranch` — not
+   `branch_off` / `newBranch` / `base`. §8.3 uses the verified names.
+
+2. **Agent labels — RESOLVED, approach A works.** `PaseoAgentCreateOptions.labels?:
+   Record<string, string>`, and `PaseoWorkspaceAgentCreateOptions` is that type minus `cwd`,
+   so labels are settable at creation from a workspace handle. No fallback needed.
+
+3. **The `paseo://` URL scheme's routes — still unverified.** `/Applications/Paseo.app`
+   registers the scheme, but its accepted routes are undocumented. The CLI script route in §9
+   works regardless, so this stays an enhancement, not a dependency.
 
 ## 12. Error handling
 
