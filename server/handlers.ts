@@ -9,12 +9,14 @@ import {
   listStatesRpc,
   moveStateRpc,
   searchIssuesRpc,
+  startWorkRpc,
   syncSettingsRpc,
   verifyRpc,
 } from "../shared/rpc";
 import { cacheSettings, loadLinearContext } from "./context";
 import { assignIssue, createComment, linkUrl, moveIssueState } from "./linear/mutations";
 import { fetchIssue, fetchStates, fetchViewer, listIssues, searchIssues } from "./linear/queries";
+import { startWork } from "./start-work";
 
 export function registerHandlers(server: PluginServerContext): void {
   server.handle(syncSettingsRpc, ({ values }) => {
@@ -70,4 +72,6 @@ export function registerHandlers(server: PluginServerContext): void {
     const { transport } = loadLinearContext(context);
     return linkUrl(transport, issueId, url, title);
   });
+
+  server.handle(startWorkRpc, ({ identifier }, context) => startWork(context, identifier));
 }
