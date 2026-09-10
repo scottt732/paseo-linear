@@ -1656,13 +1656,44 @@ RPCs.
 
 - [ ] **Step 1: Write the context helper**
 
+**Design note — why settings are pushed, not read.** `PluginHandlerContext` exposes only
+`paseo`. There is no server-side settings accessor, and the on-disk storage path is
+undocumented. The obvious fallback — pass settings as RPC input — dies on the attachment
+source: Paseo itself invokes `searchIssuesRpc` with only `{ query }`, so that call can never
+carry settings. Therefore the **client pushes** the settings document to the server, which
+caches it in memory. `PluginClientContext.rpc(contract, input)` makes this possible outside a
+component, and `settingsRpc(id)` returns the daemon-served `read` contract.
+
+First, add the sync contract to `shared/rpc.ts`:
+
+```ts
+import { LinearSettingsSchema } from "./settings";
+
+export const syncSettingsRpc = defineRpc({
+  name: "linear.syncSettings",
+  input: z.object({ values: LinearSettingsSchema }),
+  output: z.object({ ok: z.boolean() }),
+});
+```
+
 `server/context.ts`:
 
 ```ts
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
-import { type LinearSettings, LinearSettingsSchema, linearSettings } from "../shared/settings";
+import { type LinearSettings, LinearSettingsSchema } from "../shared/settings";
 import { resolveApiKey } from "./credentials";
 import { createTransport, type LinearTransport } from "./linear/client";
+
+let cached: LinearSettings = LinearSettingsSchema.parse({});
+
+/** Replaces the cached settings document. Called only by the syncSettings handler. */
+export function cacheSettings(values: LinearSettings): void {
+  cached = values;
+}
+
+export function currentSettings(): LinearSettings {
+  return cached;
+}
 
 export interface LinearContext {
   transport: LinearTransport;
@@ -1670,21 +1701,35 @@ export interface LinearContext {
   source: "env" | "settings";
 }
 
-export async function loadLinearContext(context: PluginHandlerContext): Promise<LinearContext> {
-  const stored = await context.settings.read(linearSettings);
-  const settings = LinearSettingsSchema.parse(stored ?? {});
+export function loadLinearContext(_context: PluginHandlerContext): LinearContext {
+  const settings = currentSettings();
   const { apiKey, source } = resolveApiKey(process.env, settings);
   return { transport: createTransport({ apiKey }), settings, source };
 }
 ```
 
-> **Verify while implementing:** the exact way a server handler reads its own settings document
-> is not spelled out in the public reference. Check `PluginHandlerContext` and
-> `PluginServerContext` in `node_modules/@getpaseo/plugin/dist/server/contracts.d.ts` for the
-> settings accessor and use its real name and signature here. If handlers cannot read settings
-> directly, pass the settings values in from the client as RPC input instead — the
-> `apiKey` must NOT be passed that way; in that case require the env var for the key and keep
-> only the non-secret settings client-side.
+`loadLinearContext` is synchronous now; handlers that used `await` on it still work, but drop
+the `await` where it reads better.
+
+Update `server/credentials.ts`'s no-key error message to name both fixes, and update its test:
+
+```
+"Set LINEAR_API_KEY in the daemon environment, or open Settings → Plugins → Linear and add a key"
+```
+
+Register the sync handler in `server/handlers.ts`:
+
+```ts
+server.handle(syncSettingsRpc, ({ values }) => {
+  cacheSettings(values);
+  return { ok: true };
+});
+```
+
+**Residual risk to document in the README:** a daemon-side path that runs with no Paseo client
+ever connected (a lifecycle hook on a headless daemon) sees only schema defaults, so the API
+key must come from `LINEAR_API_KEY` there. Every client-reachable path — attachment source,
+panel, settings, slash command — runs after `contribute()` has pushed, so it works either way.
 
 - [ ] **Step 2: Write the handlers**
 
@@ -1781,14 +1826,31 @@ export default function contribute(server: PluginServerContext) {
 `index.client.tsx`:
 
 ```tsx
+import { settingsRpc } from "@getpaseo/plugin";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { issueAttachments } from "./shared/attachments";
+import { syncSettingsRpc } from "./shared/rpc";
+import { LinearSettingsSchema } from "./shared/settings";
+
+const linearSettingsRpc = settingsRpc("linear");
+
+async function pushSettings(client: PluginClientContext): Promise<void> {
+  const stored = await client.rpc(linearSettingsRpc.read, {});
+  if (stored.status !== "ready") return;
+  await client.rpc(syncSettingsRpc, { values: LinearSettingsSchema.parse(stored.values) });
+}
 
 export default function contribute(client: PluginClientContext) {
   client.addAttachmentSource(issueAttachments);
+  void pushSettings(client).catch(() => {
+    // The settings screen pushes again on save; a cold read failure is not fatal.
+  });
   return () => {};
 }
 ```
+
+`pushSettings` is exported from `index.client.tsx` for reuse — Task 12's settings screen calls
+it again after each successful save so the daemon cache never goes stale.
 
 - [ ] **Step 5: Typecheck, install, and verify it runs**
 
@@ -1904,7 +1966,8 @@ export function IssueCard({ issue, theme, layout }: ChromeProps & { issue: Issue
   const styles = useMemo(
     () => ({
       body: { gap: layout.compact ? 8 : 10 },
-      crumbs: { color: theme.colors.foreground, fontSize: layout.compact ? 15 : 16, fontWeight: "600" as const },
+      crumbRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, flexWrap: "wrap" as const },
+      crumbs: { color: theme.colors.foreground, fontSize: layout.compact ? 15 : 16, fontWeight: "600" as const, flexShrink: 1 },
       row: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, flexWrap: "wrap" as const },
       state: { color: issue.state.color, fontSize: 13, fontWeight: "600" as const },
       muted: { color: theme.colors.foregroundMuted, fontSize: 13 },
@@ -1929,10 +1992,16 @@ export function IssueCard({ issue, theme, layout }: ChromeProps & { issue: Issue
 
   return (
     <View style={styles.body}>
-      <Text style={styles.crumbs}>
-        {issue.project?.icon ? `${issue.project.icon} ` : ""}
-        {issueBreadcrumb(issue).join(" · ")}
-      </Text>
+      <View style={styles.crumbRow}>
+        {issue.project?.icon ? (
+          <Icon
+            name={issue.project.icon}
+            size={layout.compact ? 15 : 16}
+            color={issue.project.color ?? theme.colors.foregroundMuted}
+          />
+        ) : null}
+        <Text style={styles.crumbs}>{issueBreadcrumb(issue).join(" · ")}</Text>
+      </View>
       <View style={styles.row}>
         <Text style={styles.state}>{issue.state.name}</Text>
         <Text style={styles.muted}>{issue.priorityLabel}</Text>
@@ -1952,7 +2021,7 @@ export function IssueCard({ issue, theme, layout }: ChromeProps & { issue: Issue
       </Text>
       <View style={styles.divider} />
       <Text style={styles.description} selectable>
-        {clampText(issue.description ?? "No description.", 12)}
+        {clampText(issue.description || "No description.", 12)}
       </Text>
       <View style={styles.divider} />
       <Pressable accessibilityRole="button" onPress={() => void openExternal(issue.url)} style={styles.action}>

@@ -121,8 +121,15 @@ either theme rather than being pinned to the light-on-dark of the reference scre
 
 **Card** — opens from the chip and contains, in order:
 
-1. Breadcrumb: project icon/emoji, then `project · ancestor · ancestor · title`, wrapping,
-   in `theme.colors.foreground`.
+1. Breadcrumb: the project icon, then `project · ancestor · ancestor · title`, wrapping, in
+   `theme.colors.foreground`.
+
+   **`project.icon` is an icon name, not an emoji** — live data returns
+   `{"name":"Shopping","icon":"Basket","color":"#4cb782"}`. The reference screenshot shows 🎁
+   because Linear renders that name as a glyph. Interpolating the field into text would print
+   the literal word "Basket", so it goes through Paseo's `Icon` component, tinted with
+   `project.color`. Unknown names render nothing, so an icon set that diverges from Lucide
+   degrades to a text-only breadcrumb rather than breaking.
 2. Status line: state name **in the state's own Linear color**, then priority label in
    `foregroundMuted`.
 3. Badge row: team, then labels, each in its Linear color at low opacity.
@@ -130,7 +137,8 @@ either theme rather than being pinned to the light-on-dark of the reference scre
    `relativeTime` helper in `shared/format.ts`.
 5. Divider.
 6. Description, clamped to ~12 lines with an ellipsis. Rendered as plain text with inline
-   `` `code` `` spans styled monospace — not a full Markdown engine.
+   `` `code` `` spans styled monospace — not a full Markdown engine. An issue with no body
+   returns `""`, not `null`, so the "No description." fallback tests emptiness, not nullness.
 
 **Interaction.** Pressing the chip opens the card; pressing the card opens the issue on
 linear.app. There is no hover behavior: React Native has no portable hover, and the v0.8 docs
