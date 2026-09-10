@@ -13,7 +13,7 @@ export default function contribute(client: PluginClientContext) {
   client.addSettingsScreen({
     id: "linear",
     title: "Linear",
-    icon: "CircleDot",
+    icon: "SquareKanban",
     Component: LinearSettingsScreen,
   });
   void pushSettings(client).catch(() => {
@@ -23,13 +23,13 @@ export default function contribute(client: PluginClientContext) {
   client.addWorkspacePanel({
     id: "issues",
     title: "Linear",
-    icon: "CircleDot",
+    icon: "SquareKanban",
     context: "workspace",
     locations: ["workspace", "explorer"],
     Component: IssuesPanel,
   });
   client.addSurface("issues", IssuesSurface);
-  client.addSidebarItem({ id: "issues", title: "Linear", icon: "CircleDot", surface: "issues" });
+  client.addSidebarItem({ id: "issues", title: "Linear", icon: "SquareKanban", surface: "issues" });
 
   client.addCommandCenterItem({
     id: "start-work",
