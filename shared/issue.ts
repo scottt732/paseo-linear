@@ -57,7 +57,7 @@ export function issueAttachmentText(issue: Issue): string {
   if (issue.labels.length > 0) {
     lines.push(`Labels: ${issue.labels.map((label) => label.name).join(", ")}`);
   }
-  lines.push("", issue.description ?? "No description.");
+  lines.push("", issue.description || "No description.");
   return lines.join("\n");
 }
 

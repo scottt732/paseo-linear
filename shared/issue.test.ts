@@ -52,6 +52,9 @@ describe("issueAttachmentText", () => {
   it("says so when there is no description", () => {
     expect(issueAttachmentText({ ...issue, description: null })).toContain("No description.");
   });
+  it("says so when the description is an empty string", () => {
+    expect(issueAttachmentText({ ...issue, description: "" })).toContain("No description.");
+  });
 });
 
 describe("issueAttachmentItem", () => {
