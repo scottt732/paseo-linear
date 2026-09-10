@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampText, identifierFromBranch, relativeTime, renderPrompt } from "./format";
+import { clampText, identifierFromBranch, isValidDueDate, relativeTime, renderPrompt } from "./format";
 
 const now = new Date("2026-09-10T12:00:00.000Z");
 
@@ -58,5 +58,20 @@ describe("identifierFromBranch", () => {
   });
   it("returns null for a digit-only segment", () => {
     expect(identifierFromBranch("release/1-2")).toBeNull();
+  });
+});
+
+describe("isValidDueDate", () => {
+  it("accepts a well-formed real calendar date", () => {
+    expect(isValidDueDate("2026-09-10")).toBe(true);
+  });
+  it("rejects an empty string", () => {
+    expect(isValidDueDate("")).toBe(false);
+  });
+  it("rejects a malformed string", () => {
+    expect(isValidDueDate("not-a-date")).toBe(false);
+  });
+  it("rejects an impossible date", () => {
+    expect(isValidDueDate("2026-02-30")).toBe(false);
   });
 });
