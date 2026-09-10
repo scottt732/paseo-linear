@@ -1,4 +1,5 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
+import { LinearButtonIcon } from "./client/logo";
 import { IssuesPanel, IssuesSurface } from "./client/panel";
 import { LinearSettingsScreen } from "./client/settings";
 import { pushSettings } from "./client/sync";
@@ -74,7 +75,7 @@ export default function contribute(client: PluginClientContext) {
       agentId,
       button: {
         title: `Linear ${identifier}`,
-        icon: "CircleDot",
+        icon: LinearButtonIcon,
         label: identifier,
         behavior: {
           kind: "menu",
@@ -83,7 +84,7 @@ export default function contribute(client: PluginClientContext) {
               kind: "item",
               id: "view",
               title: "View issue",
-              icon: "CircleDot",
+              icon: LinearButtonIcon,
               behavior: {
                 kind: "action",
                 onPress() {

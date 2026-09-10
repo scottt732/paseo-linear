@@ -1,0 +1,30 @@
+import type { PluginButtonIconProps } from "@getpaseo/plugin/client";
+import { Image } from "react-native";
+
+/*
+ * The Linear mark, rasterized from the official SVG to a 96px PNG with alpha.
+ *
+ * Why a bitmap: plugin bundles may not import react-native-svg, so an SVG path
+ * cannot be rendered. The PNG is monochrome with alpha, so `tintColor` recolors
+ * it from a theme token and it reads correctly in every Paseo theme.
+ *
+ * Note this only reaches slots that accept a component. Every string `icon`
+ * field on a sidebar item, panel, settings screen, or Command Center item takes
+ * a validated Lucide name that Paseo renders itself, and cannot take this.
+ */
+const LINEAR_MARK = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAJhUExURQAAAOLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5uLk5gAAALnSNkAAAADJdFJOUwAABBExYHqLpL/Z7fr99+nTuZ6Gd1coDQIWPWaqy9z28dfJnFs2DhdFlMPz/riCOBAteO+2ayEBB0Hg/NiFLgY+pt+MLJHdfRlq1VEyq/CSIF3EQxWI6G8II7ETL/ugHDXIsLUwG7QzbcrjNMEeBU69mvh8cUT51iYJe0fbqHkMxswaT+JQruVoJ2MfA1/n7oPr8nL1dXP0dD/FdmLezbdn0oFc5ELOoiTslStIh2QSpyXQqdEdr4Re1KxlgDmbKjtL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";
+
+export function LinearLogo({ size = 16, color }: { size?: number; color: string }) {
+  return (
+    <Image
+      source={{ uri: LINEAR_MARK }}
+      style={{ width: size, height: size, tintColor: color }}
+      accessibilityLabel="Linear"
+    />
+  );
+}
+
+/** Adapter for Paseo button slots, which supply their own size and color. */
+export function LinearButtonIcon({ size, color }: PluginButtonIconProps) {
+  return <LinearLogo size={size} color={color} />;
+}

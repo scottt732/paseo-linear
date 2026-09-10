@@ -8,6 +8,7 @@ import { relativeTime } from "../shared/format";
 import type { Issue } from "../shared/issue";
 import { listIssuesRpc, listStatesRpc, moveStateRpc, startWorkRpc } from "../shared/rpc";
 import { columnAtPoint, resolveTargetStateId } from "./drag";
+import { LinearLogo } from "./logo";
 import { CreateIssueModal } from "./create-issue";
 import { IssueCard } from "./chip";
 import { LaunchFollowUp, useLaunchFollowUp } from "./launch";
@@ -658,6 +659,7 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
 
       <Modal
         title={selected ? `${selected.identifier} · ${selected.title}` : ""}
+        icon={<LinearLogo size={16} color={theme.colors.foreground} />}
         open={selected !== null}
         onOpenChange={(next) => {
           if (!next) setSelected(null);

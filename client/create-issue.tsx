@@ -6,6 +6,7 @@ import { Pressable, Text, View } from "react-native";
 import { isValidDueDate } from "../shared/format";
 import { createIssueRpc, listStatesRpc, listTeamsRpc } from "../shared/rpc";
 import { linearSettings } from "../shared/settings";
+import { LinearLogo } from "./logo";
 
 type PluginLayout = PluginSurfaceProps["layout"];
 
@@ -132,7 +133,7 @@ export function CreateIssueModal({
   }
 
   return (
-    <Modal title={`New issue in ${stateName}`} open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+    <Modal title={`New issue in ${stateName}`} icon={<LinearLogo size={16} color={theme.colors.foreground} />} open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
       <Modal.Content>
         <View style={styles.body}>
           <Text style={styles.context}>{`Status: ${stateName}`}</Text>
