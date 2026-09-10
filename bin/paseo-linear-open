@@ -5,8 +5,11 @@ set -euo pipefail
 
 identifier="${1:?usage: paseo-linear-open <ISSUE-IDENTIFIER>}"
 
+# Note: this starts a plain agent labeled with the issue, in the current directory. It does
+# NOT create a worktree, resolve Linear's branch name, or attach the issue body — that is what
+# "start work" inside Paseo does. The agent is told to fetch the issue itself.
 exec paseo run \
   --background \
   --title "$identifier" \
   --label "linear.issue=$identifier" \
-  "Start work on Linear issue $identifier. Use the Linear plugin's issue context."
+  "Start work on Linear issue $identifier. Fetch the issue from Linear first to get its title, description, and branch name, then begin."

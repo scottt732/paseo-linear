@@ -2898,13 +2898,10 @@ export function registerHooks(server: PluginServerContext): () => void {
     const binding = resolveBinding(refreshed?.agent.labels, null);
     if (!binding) return;
 
-    const lastAssistantText = [...timeline]
+    const lastAssistant = [...timeline]
       .reverse()
-      .find((item) => item.type === "assistant" && typeof (item as { text?: unknown }).text === "string");
-    const summary = clampText(
-      String((lastAssistantText as { text?: string } | undefined)?.text ?? ""),
-      20,
-    ).slice(0, 4000);
+      .find((item) => item.type === "assistant_message");
+    const summary = clampText(lastAssistant?.text ?? "", 20).slice(0, 4000);
 
     await paseo.agents.ref(agent.id).timeline.append({
       type: "plugin",
@@ -2924,11 +2921,18 @@ export function registerHooks(server: PluginServerContext): () => void {
 }
 ```
 
-> **Verify while implementing:** the timeline item discriminator for an assistant message is
-> not documented as `"assistant"` in the reference — the documented coarse selectors are values
-> like `"reasoning"` and `"tool_call"`. Read `AgentTimelineItem` in
-> `node_modules/@getpaseo/plugin/dist` and match the real assistant-text variant. If no text
-> item is found, still append the row with an empty summary so the offer is present.
+**Resolved against the installed types.** `AgentTimelineItem` is a discriminated union in
+`@getpaseo/protocol/dist/agent-types.d.ts`, and the assistant variant is:
+
+```ts
+{ type: "assistant_message"; text: string; messageId?: string }
+```
+
+— `"assistant_message"`, not `"assistant"`. Because it is a proper discriminated union, the
+`.find((item) => item.type === "assistant_message")` above narrows on its own: `lastAssistant`
+is typed `{ type: "assistant_message"; text: string; messageId?: string } | undefined` and
+`lastAssistant?.text` needs no cast. Do not reintroduce one. When no assistant message is
+found, the row is still appended with an empty summary so the offer is present.
 
 - [ ] **Step 2: Write the timeline renderer and pill content**
 
@@ -3188,6 +3192,23 @@ tool, move issue to started status" preference handles the state transition, and
 
 Add a **Note on the `paseo://` URL scheme** stating it is registered by the app but its routes
 are unverified, so the script is the supported path today.
+
+The README must also cover these four operational facts, each discovered during implementation:
+
+1. **Credentials.** Either `LINEAR_API_KEY` in the daemon environment or a key in Settings →
+   Plugins → Linear. The environment variable wins when both are set. The settings value is
+   stored as ordinary host-side JSON on the daemon — not a credential vault.
+2. **How the daemon gets settings, and the one case where it doesn't.** `PluginHandlerContext`
+   has no settings accessor, so the client pushes the settings document to the daemon at
+   startup and after every save. Every client-reachable path therefore works with either
+   credential source. But a daemon-side path running with **no Paseo client ever connected** —
+   a lifecycle hook on a headless daemon — sees schema defaults only, so it needs
+   `LINEAR_API_KEY`. Say this plainly; it is the one sharp edge in the design.
+3. **A provider must be set** in Settings → Plugins → Linear before "start work" will run. The
+   SDK has no default-provider accessor and the plugin will not pick one for you.
+4. **A repository path must be set** before "start work" will run — it is the checkout the
+   worktree branches from. `baseRef` defaults to `origin/main` deliberately, because Paseo
+   fetches remote refs in the background while a local `main` may be stale.
 
 - [ ] **Step 4: Full verification pass**
 

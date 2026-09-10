@@ -32,7 +32,7 @@ The plugin adds five things to Paseo:
   `/linear ENG-123` slash command, or directly from the panel. Any of these creates a worktree
   agent branched off the configured repository, with the issue's context as the agent's first
   message.
-- **A per-agent composer pill.** Any agent whose workspace is tagged with a `linear.issue` label
+- **A per-agent composer pill.** Any agent tagged with a `linear.issue` label
   gets a "Linear ENG-123" pill in its composer, with a menu to view the issue, open it in
   Linear, comment on it, move its state, or link the current branch. A turn-end offer row also
   appears at the end of an agent turn, offering to do the same.
@@ -85,6 +85,14 @@ Linear can open an issue directly into a Paseo agent using a custom coding tool.
 
 3. Linear invokes the script with the issue identifier as its first argument, which starts a
    background Paseo agent labeled with `linear.issue=<identifier>`.
+
+**What the script does and does not do.** It is a thin launcher: it starts an agent in the
+current directory, labeled with the issue, and tells that agent to fetch the issue itself. It
+does **not** create a worktree, resolve Linear's configured branch name, or attach the issue
+body — that richer path is what "start work" inside Paseo does (Command Center, `/linear`, or
+the panel). Because the agent carries the `linear.issue` label, the composer pill and the
+turn-end offer row still work for it. If you want the worktree and the prepared prompt, start
+from inside Paseo rather than from Linear.
 
 Linear's own "on open in coding tool, move issue to started status" preference handles moving
 the issue to Started — the script does not do this itself. Once the tool is registered, you can
