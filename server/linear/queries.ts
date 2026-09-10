@@ -81,6 +81,13 @@ const VIEWER_QUERY = `query PaseoLinearViewer { viewer { id name } }`;
 const STATES_QUERY = `query PaseoLinearStates($teamId: String!) {
   team(id: $teamId) { states { nodes { id name type position } } }
 }`;
+const TEAMS_QUERY = `query PaseoLinearTeams { teams(first: 100) { nodes { id key name } } }`;
+
+const TeamsSchema = z.object({
+  teams: z.object({
+    nodes: z.array(z.object({ id: z.string(), key: z.string(), name: z.string() })),
+  }),
+});
 
 const IDENTIFIER = /^[A-Z][A-Z0-9]*-\d+$/i;
 
@@ -172,4 +179,11 @@ export async function fetchStates(
 ): Promise<Array<{ id: string; name: string; type: string; position: number }>> {
   const data = await transport.request(STATES_QUERY, { teamId }, StatesSchema);
   return [...data.team.states.nodes].sort((a, b) => a.position - b.position);
+}
+
+export async function fetchTeams(
+  transport: LinearTransport,
+): Promise<Array<{ id: string; key: string; name: string }>> {
+  const data = await transport.request(TEAMS_QUERY, {}, TeamsSchema);
+  return data.teams.nodes;
 }

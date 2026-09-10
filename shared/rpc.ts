@@ -30,11 +30,18 @@ export const createIssueRpc = defineRpc({
     teamId: z.string(),
     stateId: z.string().optional(),
     assigneeId: z.string().optional(),
+    assignToMe: z.boolean().optional(),
     priority: z.number().optional(),
     dueDate: z.string().optional(),
     description: z.string().optional(),
   }),
   output: z.object({ identifier: z.string(), url: z.url(), id: z.string() }),
+});
+
+export const listTeamsRpc = defineRpc({
+  name: "linear.teams",
+  input: z.object({}),
+  output: z.object({ teams: z.array(z.object({ id: z.string(), key: z.string(), name: z.string() })) }),
 });
 
 export const verifyRpc = defineRpc({

@@ -8,6 +8,7 @@ import {
   linkBranchRpc,
   listIssuesRpc,
   listStatesRpc,
+  listTeamsRpc,
   moveStateRpc,
   searchIssuesRpc,
   startWorkRpc,
@@ -16,7 +17,7 @@ import {
 } from "../shared/rpc";
 import { cacheSettings, loadLinearContext } from "./context";
 import { assignIssue, createComment, createIssue, linkUrl, moveIssueState } from "./linear/mutations";
-import { fetchIssue, fetchStates, fetchViewer, listIssues, searchIssues } from "./linear/queries";
+import { fetchIssue, fetchStates, fetchTeams, fetchViewer, listIssues, searchIssues } from "./linear/queries";
 import { startWork } from "./start-work";
 
 export function registerHandlers(server: PluginServerContext): void {
@@ -74,9 +75,19 @@ export function registerHandlers(server: PluginServerContext): void {
     return linkUrl(transport, issueId, url, title);
   });
 
-  server.handle(createIssueRpc, async (input, context) => {
+  server.handle(createIssueRpc, async ({ assignToMe, ...input }, context) => {
     const { transport } = loadLinearContext(context);
-    return createIssue(transport, input);
+    let assigneeId = input.assigneeId;
+    if (assignToMe) {
+      const viewer = await fetchViewer(transport);
+      assigneeId = viewer.id;
+    }
+    return createIssue(transport, { ...input, assigneeId });
+  });
+
+  server.handle(listTeamsRpc, async (_input, context) => {
+    const { transport } = loadLinearContext(context);
+    return { teams: await fetchTeams(transport) };
   });
 
   server.handle(startWorkRpc, ({ identifier }, context) => startWork(context, identifier));

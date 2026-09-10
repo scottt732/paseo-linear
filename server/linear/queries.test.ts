@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 import type { LinearTransport } from "./client";
-import { countPullRequests, fetchIssue, listIssues, searchIssues, toIssue } from "./queries";
+import { countPullRequests, fetchIssue, fetchTeams, listIssues, searchIssues, toIssue } from "./queries";
 
 const rawIssue = {
   id: "uuid-1",
@@ -146,5 +146,15 @@ describe("listIssues", () => {
       assignee: { null: true },
       state: { type: { nin: ["completed", "canceled"] } },
     });
+  });
+});
+
+describe("fetchTeams", () => {
+  it("returns the team list from the teams query", async () => {
+    const { transport, calls } = stubTransport(() => ({
+      teams: { nodes: [{ id: "t1", key: "ENG", name: "Engineering" }] },
+    }));
+    expect(await fetchTeams(transport)).toEqual([{ id: "t1", key: "ENG", name: "Engineering" }]);
+    expect(calls[0].variables).toEqual({});
   });
 });
