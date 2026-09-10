@@ -21,6 +21,13 @@ const IssueUpdateSchema = z.object({
 
 const AttachmentSchema = z.object({ attachmentLinkURL: z.object({ success: z.boolean() }) });
 
+const IssueCreateSchema = z.object({
+  issueCreate: z.object({
+    success: z.boolean(),
+    issue: z.object({ id: z.string(), identifier: z.string(), url: z.string() }).nullable(),
+  }),
+});
+
 const COMMENT_MUTATION = `mutation PaseoLinearComment($issueId: String!, $body: String!) {
   commentCreate(input: { issueId: $issueId, body: $body }) { success comment { url } }
 }`;
@@ -32,6 +39,20 @@ const ISSUE_UPDATE_MUTATION = `mutation PaseoLinearIssueUpdate($id: String!, $in
 const LINK_MUTATION = `mutation PaseoLinearLink($issueId: String!, $url: String!, $title: String!) {
   attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }
 }`;
+
+const ISSUE_CREATE_MUTATION = `mutation PaseoLinearIssueCreate($input: IssueCreateInput!) {
+  issueCreate(input: $input) { success issue { id identifier url } }
+}`;
+
+export interface CreateIssueInput {
+  title: string;
+  teamId: string;
+  stateId?: string;
+  assigneeId?: string;
+  priority?: number;
+  dueDate?: string;
+  description?: string;
+}
 
 export async function createComment(
   transport: LinearTransport,
@@ -71,6 +92,30 @@ export async function assignIssue(
 ): Promise<{ assigneeName: string }> {
   const issue = await updateIssue(transport, issueId, { assigneeId });
   return { assigneeName: issue.assignee?.name ?? "" };
+}
+
+export async function createIssue(
+  transport: LinearTransport,
+  input: CreateIssueInput,
+): Promise<{ identifier: string; url: string; id: string }> {
+  const { title, teamId, stateId, assigneeId, priority, dueDate, description } = input;
+  const variables: Record<string, unknown> = { title, teamId };
+  if (stateId !== undefined) variables.stateId = stateId;
+  if (assigneeId !== undefined) variables.assigneeId = assigneeId;
+  if (priority !== undefined) variables.priority = priority;
+  if (dueDate !== undefined) variables.dueDate = dueDate;
+  if (description !== undefined) variables.description = description;
+
+  const data = await transport.request(
+    ISSUE_CREATE_MUTATION,
+    { input: variables },
+    IssueCreateSchema,
+  );
+  if (!data.issueCreate.success || !data.issueCreate.issue) {
+    throw new LinearApiError("Linear did not accept the issue");
+  }
+  const { id, identifier, url } = data.issueCreate.issue;
+  return { identifier, url, id };
 }
 
 export async function linkUrl(

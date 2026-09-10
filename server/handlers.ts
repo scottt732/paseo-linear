@@ -3,6 +3,7 @@ import { issueAttachmentItem } from "../shared/issue";
 import {
   assignSelfRpc,
   commentRpc,
+  createIssueRpc,
   getIssueRpc,
   linkBranchRpc,
   listIssuesRpc,
@@ -14,7 +15,7 @@ import {
   verifyRpc,
 } from "../shared/rpc";
 import { cacheSettings, loadLinearContext } from "./context";
-import { assignIssue, createComment, linkUrl, moveIssueState } from "./linear/mutations";
+import { assignIssue, createComment, createIssue, linkUrl, moveIssueState } from "./linear/mutations";
 import { fetchIssue, fetchStates, fetchViewer, listIssues, searchIssues } from "./linear/queries";
 import { startWork } from "./start-work";
 
@@ -71,6 +72,11 @@ export function registerHandlers(server: PluginServerContext): void {
   server.handle(linkBranchRpc, async ({ issueId, url, title }, context) => {
     const { transport } = loadLinearContext(context);
     return linkUrl(transport, issueId, url, title);
+  });
+
+  server.handle(createIssueRpc, async (input, context) => {
+    const { transport } = loadLinearContext(context);
+    return createIssue(transport, input);
   });
 
   server.handle(startWorkRpc, ({ identifier }, context) => startWork(context, identifier));

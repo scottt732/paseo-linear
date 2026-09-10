@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 import type { LinearTransport } from "./client";
-import { assignIssue, createComment, linkUrl, moveIssueState } from "./mutations";
+import { assignIssue, createComment, createIssue, linkUrl, moveIssueState } from "./mutations";
 
 function stub(result: unknown): {
   transport: LinearTransport;
@@ -57,6 +57,66 @@ describe("assignIssue", () => {
     });
     expect(await assignIssue(transport, "issue-1", "user-1")).toEqual({ assigneeName: "Scott" });
     expect(calls[0].variables).toEqual({ id: "issue-1", input: { assigneeId: "user-1" } });
+  });
+});
+
+describe("createIssue", () => {
+  it("creates the issue and returns its identifier, url, and id", async () => {
+    const { transport, calls } = stub({
+      issueCreate: {
+        success: true,
+        issue: { id: "issue-9", identifier: "ENG-9", url: "https://linear.app/thecosmos/issue/ENG-9" },
+      },
+    });
+    expect(
+      await createIssue(transport, {
+        title: "New issue",
+        teamId: "team-1",
+        stateId: "state-1",
+        assigneeId: "user-1",
+        priority: 2,
+        dueDate: "2026-09-10",
+        description: "Body",
+      }),
+    ).toEqual({
+      identifier: "ENG-9",
+      url: "https://linear.app/thecosmos/issue/ENG-9",
+      id: "issue-9",
+    });
+    expect(calls[0].variables).toEqual({
+      input: {
+        title: "New issue",
+        teamId: "team-1",
+        stateId: "state-1",
+        assigneeId: "user-1",
+        priority: 2,
+        dueDate: "2026-09-10",
+        description: "Body",
+      },
+    });
+  });
+
+  it("omits unset optional fields from the input", async () => {
+    const { transport, calls } = stub({
+      issueCreate: {
+        success: true,
+        issue: { id: "issue-9", identifier: "ENG-9", url: "https://linear.app/thecosmos/issue/ENG-9" },
+      },
+    });
+    await createIssue(transport, { title: "New issue", teamId: "team-1" });
+    expect(calls[0].variables).toEqual({ input: { title: "New issue", teamId: "team-1" } });
+  });
+
+  it("throws when Linear reports failure", async () => {
+    const { transport } = stub({ issueCreate: { success: false, issue: null } });
+    await expect(createIssue(transport, { title: "New issue", teamId: "team-1" })).rejects.toThrow(
+      "issue",
+    );
+  });
+
+  it("throws when success is true but issue is null", async () => {
+    const { transport } = stub({ issueCreate: { success: true, issue: null } });
+    await expect(createIssue(transport, { title: "New issue", teamId: "team-1" })).rejects.toThrow();
   });
 });
 
