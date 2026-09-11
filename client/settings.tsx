@@ -13,21 +13,28 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ScrollView, Text } from "react-native";
 import { linearSettings, type LinearSettings } from "../shared/settings";
-import { syncSettingsRpc, verifyRpc } from "../shared/rpc";
+import { listTeamsRpc, syncSettingsRpc, verifyRpc } from "../shared/rpc";
 
 const NOT_SET_OPTION = { label: "Not set", value: "" };
+const ALL_TEAMS_OPTION = { label: "All teams", value: "" };
 
 export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   const settings = useSettings(linearSettings);
   const paseo = usePaseo();
   const verify = useRpc(verifyRpc);
   const sync = useRpc(syncSettingsRpc);
+  const listTeams = useRpc(listTeamsRpc);
   const toast = useToast();
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   const providersQuery = useQuery({
     queryKey: ["linear", "settings", "providers"],
     queryFn: () => paseo.providers.listAvailable(),
+  });
+
+  const teamsQuery = useQuery({
+    queryKey: ["linear", "settings", "teams"],
+    queryFn: () => listTeams({}),
   });
 
   if (settings.status === "loading") {
@@ -57,6 +64,28 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   }, [providersQuery.data, values.provider]);
 
   const providerFieldUsable = providersQuery.isSuccess;
+
+  const teamOptions = useMemo(() => {
+    const teams = teamsQuery.data?.teams ?? [];
+    // Two teams can only share a display name if their keys differ, so only
+    // pay the "(KEY)" suffix tax on names that are actually ambiguous.
+    const nameCounts = new Map<string, number>();
+    for (const team of teams) nameCounts.set(team.name, (nameCounts.get(team.name) ?? 0) + 1);
+    const available = teams.map((team) => ({
+      label: (nameCounts.get(team.name) ?? 0) > 1 ? `${team.name} (${team.key})` : team.name,
+      value: team.key,
+    }));
+    const savedTeamKey = values.defaultTeamKey.trim();
+    const options = [ALL_TEAMS_OPTION, ...available];
+    // Never silently drop a configured value: a renamed/deleted team, or a key
+    // typed by hand before this was a picker, must still round-trip.
+    if (savedTeamKey && !available.some((option) => option.value === savedTeamKey)) {
+      options.splice(1, 0, { label: savedTeamKey, value: savedTeamKey });
+    }
+    return options;
+  }, [teamsQuery.data, values.defaultTeamKey]);
+
+  const teamFieldUsable = teamsQuery.isSuccess;
 
   async function save(patch: Partial<LinearSettings>) {
     const nextValues = { ...values, ...patch };
@@ -107,13 +136,23 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
 
       <SettingsSection title="Defaults">
         <SettingsCard>
-          <SettingsInput
-            label="Default team key"
-            hint="Scopes search and the issue panel. Leave empty for all teams."
-            initialValue={values.defaultTeamKey}
-            placeholder="ENG"
-            onChangeText={(text) => setDraft((d) => ({ ...d, defaultTeamKey: text }))}
-          />
+          {teamFieldUsable ? (
+            <SettingsSelect
+              label="Default team"
+              hint="Scopes issue search and the board's tabs to one team. All teams searches everywhere."
+              value={draft.defaultTeamKey ?? values.defaultTeamKey}
+              options={teamOptions}
+              onValueChange={(value) => setDraft((d) => ({ ...d, defaultTeamKey: value }))}
+            />
+          ) : (
+            <SettingsInput
+              label="Default team"
+              hint="Scopes issue search and the board's tabs to one team. Leave empty for all teams. Could not load the list of teams from Linear, so this is a free-text field for now — enter a team key like ENG."
+              initialValue={values.defaultTeamKey}
+              placeholder="ENG"
+              onChangeText={(text) => setDraft((d) => ({ ...d, defaultTeamKey: text }))}
+            />
+          )}
           <SettingsInput
             label="Repository path"
             hint="Absolute path to the checkout worktrees are created from. Optional when starting work from the Linear panel inside a workspace, which defaults to that workspace's project root — required for the sidebar surface, the /linear slash command, and the Command Center item."
@@ -129,7 +168,7 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
           {providerFieldUsable ? (
             <SettingsSelect
               label="Provider"
-              hint="A bare provider like claude is valid; provider/model (e.g. claude/claude-opus-5) pins a model. Not set uses the daemon default."
+              hint="Required before starting work from an issue — there is no default. A bare provider like claude is valid; provider/model (e.g. claude/claude-opus-5) pins a model."
               value={draft.provider ?? values.provider}
               options={providerOptions}
               onValueChange={(value) => setDraft((d) => ({ ...d, provider: value }))}
@@ -137,7 +176,7 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
           ) : (
             <SettingsInput
               label="Provider"
-              hint="A bare provider like claude is valid; provider/model (e.g. claude/claude-opus-5) pins a model. Empty uses the daemon default. Could not load the list of available providers from the daemon, so this is a free-text field for now."
+              hint="Required before starting work from an issue — there is no default. A bare provider like claude is valid; provider/model (e.g. claude/claude-opus-5) pins a model. Could not load the list of available providers from the daemon, so this is a free-text field for now."
               initialValue={values.provider}
               placeholder="claude"
               onChangeText={(text) => setDraft((d) => ({ ...d, provider: text }))}
