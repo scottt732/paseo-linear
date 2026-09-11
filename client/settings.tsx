@@ -1,24 +1,34 @@
-import { type PluginSurfaceProps, useRpc, useSettings } from "@getpaseo/plugin/client";
+import { type PluginSurfaceProps, useRpc, useSettings, usePaseo } from "@getpaseo/plugin/client";
 import {
   SettingsAction,
   SettingsCard,
   SettingsInput,
   SettingsRow,
   SettingsSection,
+  SettingsSelect,
   SettingsSwitch,
 } from "@getpaseo/plugin/client/ui";
 import { useToast } from "@getpaseo/plugin/client/react-native";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { ScrollView, Text } from "react-native";
 import { linearSettings, type LinearSettings } from "../shared/settings";
 import { syncSettingsRpc, verifyRpc } from "../shared/rpc";
 
+const NOT_SET_OPTION = { label: "Not set", value: "" };
+
 export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   const settings = useSettings(linearSettings);
+  const paseo = usePaseo();
   const verify = useRpc(verifyRpc);
   const sync = useRpc(syncSettingsRpc);
   const toast = useToast();
   const [draft, setDraft] = useState<Record<string, string>>({});
+
+  const providersQuery = useQuery({
+    queryKey: ["linear", "settings", "providers"],
+    queryFn: () => paseo.providers.listAvailable(),
+  });
 
   if (settings.status === "loading") {
     return <Text style={{ color: theme.colors.foregroundMuted }}>Loading…</Text>;
@@ -30,6 +40,23 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   const values = settings.values;
   const revision = settings.revision;
   const saveValues = settings.save;
+
+  const providerOptions = useMemo(() => {
+    const available = (providersQuery.data?.providers ?? [])
+      .filter((entry) => entry.available)
+      .map((entry) => ({ label: entry.provider, value: entry.provider }));
+    const savedProvider = values.provider.trim();
+    const options = [NOT_SET_OPTION, ...available];
+    // Never silently drop a configured value: a saved provider that pins a model
+    // (e.g. "claude/claude-opus-5") or is otherwise absent from the daemon's
+    // available list must still round-trip when the screen is opened.
+    if (savedProvider && !available.some((option) => option.value === savedProvider)) {
+      options.splice(1, 0, { label: savedProvider, value: savedProvider });
+    }
+    return options;
+  }, [providersQuery.data, values.provider]);
+
+  const providerFieldUsable = providersQuery.isSuccess;
 
   async function save(patch: Partial<LinearSettings>) {
     const nextValues = { ...values, ...patch };
@@ -89,7 +116,7 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
           />
           <SettingsInput
             label="Repository path"
-            hint="Absolute path to the checkout worktrees are created from."
+            hint="Absolute path to the checkout worktrees are created from. Optional when starting work from the Linear panel inside a workspace, which defaults to that workspace's project root — required for the sidebar surface, the /linear slash command, and the Command Center item."
             initialValue={values.repositoryPath}
             onChangeText={(text) => setDraft((d) => ({ ...d, repositoryPath: text }))}
           />
@@ -99,13 +126,23 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
             initialValue={values.baseRef}
             onChangeText={(text) => setDraft((d) => ({ ...d, baseRef: text }))}
           />
-          <SettingsInput
-            label="Provider"
-            hint="provider/model for issue-launched agents. Empty uses the daemon default."
-            initialValue={values.provider}
-            placeholder="claude-code/claude-opus-5"
-            onChangeText={(text) => setDraft((d) => ({ ...d, provider: text }))}
-          />
+          {providerFieldUsable ? (
+            <SettingsSelect
+              label="Provider"
+              hint="A bare provider like claude is valid; provider/model (e.g. claude/claude-opus-5) pins a model. Not set uses the daemon default."
+              value={draft.provider ?? values.provider}
+              options={providerOptions}
+              onValueChange={(value) => setDraft((d) => ({ ...d, provider: value }))}
+            />
+          ) : (
+            <SettingsInput
+              label="Provider"
+              hint="A bare provider like claude is valid; provider/model (e.g. claude/claude-opus-5) pins a model. Empty uses the daemon default. Could not load the list of available providers from the daemon, so this is a free-text field for now."
+              initialValue={values.provider}
+              placeholder="claude"
+              onChangeText={(text) => setDraft((d) => ({ ...d, provider: text }))}
+            />
+          )}
           <SettingsAction
             label="Save defaults"
             actionLabel="Save"
