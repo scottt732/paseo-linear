@@ -13,10 +13,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ScrollView, Text } from "react-native";
 import { linearSettings, type LinearSettings } from "../shared/settings";
-import { listTeamsRpc, syncSettingsRpc, verifyRpc } from "../shared/rpc";
+import { listLabelGroupsRpc, listTeamsRpc, syncSettingsRpc, verifyRpc } from "../shared/rpc";
 
 const NOT_SET_OPTION = { label: "Not set", value: "" };
 const ALL_TEAMS_OPTION = { label: "All teams", value: "" };
+const NO_LABEL_GROUP_OPTION = { label: "None", value: "" };
 
 export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   const settings = useSettings(linearSettings);
@@ -24,6 +25,7 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   const verify = useRpc(verifyRpc);
   const sync = useRpc(syncSettingsRpc);
   const listTeams = useRpc(listTeamsRpc);
+  const listLabelGroups = useRpc(listLabelGroupsRpc);
   const toast = useToast();
   const [draft, setDraft] = useState<Record<string, string>>({});
 
@@ -35,6 +37,11 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   const teamsQuery = useQuery({
     queryKey: ["linear", "settings", "teams"],
     queryFn: () => listTeams({}),
+  });
+
+  const labelGroupsQuery = useQuery({
+    queryKey: ["linear", "settings", "label-groups"],
+    queryFn: () => listLabelGroups({}),
   });
 
   if (settings.status === "loading") {
@@ -86,6 +93,21 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
   }, [teamsQuery.data, values.defaultTeamKey]);
 
   const teamFieldUsable = teamsQuery.isSuccess;
+
+  const labelGroupOptions = useMemo(() => {
+    const groups = labelGroupsQuery.data?.groups ?? [];
+    const available = groups.map((group) => ({ label: group, value: group }));
+    const savedGroup = values.repoLabelGroup.trim();
+    const options = [NO_LABEL_GROUP_OPTION, ...available];
+    // Never silently drop a configured value: a group renamed/removed in Linear,
+    // or one typed by hand before this was a picker, must still round-trip.
+    if (savedGroup && !available.some((option) => option.value === savedGroup)) {
+      options.splice(1, 0, { label: savedGroup, value: savedGroup });
+    }
+    return options;
+  }, [labelGroupsQuery.data, values.repoLabelGroup]);
+
+  const labelGroupFieldUsable = labelGroupsQuery.isSuccess;
 
   async function save(patch: Partial<LinearSettings>) {
     const nextValues = { ...values, ...patch };
@@ -159,6 +181,23 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
             initialValue={values.repositoryPath}
             onChangeText={(text) => setDraft((d) => ({ ...d, repositoryPath: text }))}
           />
+          {labelGroupFieldUsable ? (
+            <SettingsSelect
+              label="Repository label group"
+              hint="Names which Linear label group identifies the repository, e.g. Agent for labels like Agent/cosmos-graphql. Used to preselect the repository when starting work from an issue. None disables label matching."
+              value={draft.repoLabelGroup ?? values.repoLabelGroup}
+              options={labelGroupOptions}
+              onValueChange={(value) => setDraft((d) => ({ ...d, repoLabelGroup: value }))}
+            />
+          ) : (
+            <SettingsInput
+              label="Repository label group"
+              hint="Names which Linear label group identifies the repository, e.g. Agent for labels like Agent/cosmos-graphql. Used to preselect the repository when starting work from an issue. Leave empty to disable label matching. Could not load the list of label groups from Linear, so this is a free-text field for now."
+              initialValue={values.repoLabelGroup}
+              placeholder="Agent"
+              onChangeText={(text) => setDraft((d) => ({ ...d, repoLabelGroup: text }))}
+            />
+          )}
           <SettingsInput
             label="Base ref"
             hint="Use a remote-tracking ref like origin/main so worktrees start from fetched history, not a stale local branch."
@@ -189,6 +228,7 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
               void save({
                 defaultTeamKey: draft.defaultTeamKey ?? values.defaultTeamKey,
                 repositoryPath: draft.repositoryPath ?? values.repositoryPath,
+                repoLabelGroup: draft.repoLabelGroup ?? values.repoLabelGroup,
                 baseRef: draft.baseRef ?? values.baseRef,
                 provider: draft.provider ?? values.provider,
               })
