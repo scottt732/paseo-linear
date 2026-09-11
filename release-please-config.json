@@ -20,6 +20,7 @@
     ".": {
       "release-type": "node",
       "package-name": "paseo-linear",
+      "initial-version": "0.1.0",
       "changelog-path": "CHANGELOG.md"
     }
   }
