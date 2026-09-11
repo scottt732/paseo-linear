@@ -11,6 +11,9 @@ export const LinearSettingsSchema = z.object({
   promptTemplate: z.string().default(DEFAULT_PROMPT_TEMPLATE),
   moveToStarted: z.boolean().default(true),
   assignToMe: z.boolean().default(false),
+  repoLabelGroup: z.string().default("Agent"),
+  projectByRepoLabel: z.record(z.string(), z.string()).default({}),
+  lastProjectId: z.string().default(""),
 });
 
 export type LinearSettings = z.infer<typeof LinearSettingsSchema>;
