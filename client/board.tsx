@@ -1,12 +1,14 @@
 import type { PluginTheme } from "@getpaseo/plugin";
-import { type PluginSurfaceProps, useRpc, useSettings } from "@getpaseo/plugin/client";
+import { type PluginSurfaceProps, useRpc, useSettings, usePaseo } from "@getpaseo/plugin/client";
 import { FlatList, Icon, Modal, ScrollView, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, PanResponder, Pressable, Text, View } from "react-native";
 import { relativeTime } from "../shared/format";
 import type { Issue } from "../shared/issue";
-import { listIssuesRpc, listStatesRpc, moveStateRpc, startWorkRpc } from "../shared/rpc";
+import { listIssuesRpc, listStatesRpc, moveStateRpc, startWorkRpc, syncSettingsRpc } from "../shared/rpc";
+import { explainRepoMatch } from "../shared/repo-explain";
+import { matchProject, type ProjectRef } from "../shared/repo-match";
 import { linearSettings } from "../shared/settings";
 import { type DropEffect, columnAtPoint, dropEffect, resolveTargetStateId } from "./drag";
 import { resolveStartWorkAvailability } from "./start-work-state";
@@ -485,14 +487,18 @@ export function IssuesBoard({
   const [originColumn, setOriginColumn] = useState<string | null>(null);
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [manualProjectId, setManualProjectId] = useState<string | null>(null);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const listIssues = useRpc(listIssuesRpc);
   const listStates = useRpc(listStatesRpc);
   const moveState = useRpc(moveStateRpc);
   const startWork = useRpc(startWorkRpc);
+  const syncSettings = useRpc(syncSettingsRpc);
   const toast = useToast();
   const { pending, offer, dismiss } = useLaunchFollowUp();
   const now = useMemo(() => new Date(), []);
   const settingsState = useSettings(linearSettings);
+  const paseo = usePaseo();
 
   // Settings still loading is a transient, honest "don't know yet" — never
   // report it as "not configured" (see resolveStartWorkAvailability). A
@@ -502,7 +508,58 @@ export function IssuesBoard({
   const settingsLoading = settingsState.status === "loading";
   const settingsValues = settingsState.status === "ready" ? settingsState.values : null;
   const missingProvider = !(settingsValues?.provider.trim());
-  const effectiveRepositoryPath = settingsValues?.repositoryPath.trim() || repositoryPath?.trim() || "";
+
+  const projectsQuery = useQuery({
+    queryKey: ["linear", "projects"],
+    queryFn: () => paseo.projects.list(),
+  });
+
+  // Prefer the custom name when set — that is the name the user sees and
+  // renames in Paseo itself. rootPath is what actually disambiguates two
+  // projects that happen to share a name.
+  const projects = useMemo<ProjectRef[]>(
+    () =>
+      (projectsQuery.data?.projects ?? []).map((project) => ({
+        id: project.projectId,
+        name: project.projectCustomName || project.projectDisplayName,
+        rootPath: project.projectRootPath,
+      })),
+    [projectsQuery.data],
+  );
+
+  // A fresh card open should start from the automatic match, not whatever was
+  // last picked (manually or automatically) for a previous issue.
+  const selectedIssueId = selected?.id ?? null;
+  useEffect(() => {
+    setManualProjectId(null);
+    setProjectPickerOpen(false);
+    // Deliberately keyed only on the issue identity, not on projects/settings —
+    // those should recompute the automatic match in place, not reset a choice
+    // the user already made while this modal is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIssueId]);
+
+  const repoMatch = useMemo(() => {
+    if (!selected) return null;
+    return matchProject({
+      labels: selected.labels,
+      repoLabelGroup: settingsValues?.repoLabelGroup ?? "",
+      projects,
+      projectByRepoLabel: settingsValues?.projectByRepoLabel ?? {},
+      lastProjectId: settingsValues?.lastProjectId ?? "",
+    });
+  }, [selected, projects, settingsValues]);
+
+  const selectedProjectId = manualProjectId ?? repoMatch?.project?.id ?? null;
+  const selectedProject = selectedProjectId
+    ? (projects.find((project) => project.id === selectedProjectId) ?? null)
+    : null;
+  // Once the user has made an explicit choice, the automatic-match copy no
+  // longer describes what's shown — only explain an unmodified preselection.
+  const matchExplanation = manualProjectId === null && repoMatch ? explainRepoMatch(repoMatch) : null;
+
+  const effectiveRepositoryPath =
+    settingsValues?.repositoryPath.trim() || selectedProject?.rootPath.trim() || repositoryPath?.trim() || "";
   const missingRepositoryPath = !effectiveRepositoryPath;
   const missingSettingMessage = missingStartWorkSetting(missingProvider, missingRepositoryPath);
   const startWorkAvailability = resolveStartWorkAvailability(settingsLoading, missingSettingMessage);
@@ -556,9 +613,35 @@ export function IssuesBoard({
       boardWrap: { flex: 1, minHeight: 0 },
       board: { flex: 1 },
       boardContent: { flexDirection: "row" as const, paddingBottom: 8 },
+      startRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, gap: 8 },
       start: { color: theme.colors.accent, fontSize: 13, paddingVertical: 8 },
       startDisabled: { color: theme.colors.foregroundMuted, fontSize: 13, paddingVertical: 8 },
       startHint: { color: theme.colors.foregroundMuted, fontSize: 12, marginTop: -4 },
+      repoPicker: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface1,
+      },
+      repoPickerText: { color: theme.colors.foreground, fontSize: 13 },
+      repoPickerPlaceholder: { color: theme.colors.foregroundMuted, fontSize: 13 },
+      repoMatchHint: { color: theme.colors.foregroundMuted, fontSize: 12, marginTop: -4 },
+      repoProjectList: {
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: 8,
+        marginTop: 4,
+        maxHeight: 200,
+      },
+      repoProjectRow: { paddingHorizontal: 10, paddingVertical: 8 },
+      repoProjectRowDivider: { borderTopWidth: 1, borderTopColor: theme.colors.border },
+      repoProjectName: { color: theme.colors.foreground, fontSize: 13 },
+      repoProjectPath: { color: theme.colors.foregroundMuted, fontSize: 11, marginTop: 2 },
       moveLabel: { color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "600" as const, marginTop: 4 },
       moveRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, paddingVertical: 8 },
       moveDot: { width: 8, height: 8, borderRadius: 4 },
@@ -651,12 +734,38 @@ export function IssuesBoard({
     clearDrag();
   }
 
-  async function begin(issue: Issue) {
+  // A convenience write, not part of the start-work operation: the worktree and
+  // agent already exist by the time this runs, so a stale-revision conflict or
+  // any other failure here is swallowed quietly rather than surfaced as an error.
+  async function rememberProjectChoice(project: ProjectRef, repoLabel: string | null) {
+    if (settingsState.status !== "ready") return;
     try {
-      const result = await startWork({ identifier: issue.identifier, repositoryPath });
+      const nextValues = {
+        ...settingsState.values,
+        lastProjectId: project.id,
+        ...(repoLabel
+          ? { projectByRepoLabel: { ...settingsState.values.projectByRepoLabel, [repoLabel]: project.id } }
+          : {}),
+      };
+      const ok = await settingsState.save(nextValues, settingsState.revision);
+      if (ok) await syncSettings({ values: nextValues });
+    } catch {
+      // Swallow — see comment above.
+    }
+  }
+
+  async function begin(issue: Issue) {
+    const project = selectedProject;
+    const repoLabel = repoMatch?.repoLabel ?? null;
+    try {
+      const result = await startWork({
+        identifier: issue.identifier,
+        repositoryPath: project?.rootPath ?? repositoryPath,
+      });
       toast.show(`Started ${issue.identifier} on ${result.branchName}`, { variant: "success" });
       setSelected(null);
       offer(issue);
+      if (project) void rememberProjectChoice(project, repoLabel);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not start work");
     }
@@ -746,19 +855,69 @@ export function IssuesBoard({
           {selected ? (
             <View style={{ gap: layout.compact ? 8 : 12 }}>
               <IssueCard issue={selected} theme={theme} layout={layout} />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: !canStartWork }}
-                onPress={() => {
-                  if (canStartWork) void begin(selected);
-                }}
-              >
-                <Text style={canStartWork ? styles.start : styles.startDisabled}>
-                  Start work in a new worktree
-                </Text>
-              </Pressable>
+              <View style={styles.startRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !canStartWork }}
+                  onPress={() => {
+                    if (canStartWork) void begin(selected);
+                  }}
+                >
+                  <Text style={canStartWork ? styles.start : styles.startDisabled}>
+                    Start work in a new worktree
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose repository"
+                  onPress={() => setProjectPickerOpen((open) => !open)}
+                  style={styles.repoPicker}
+                >
+                  <Text
+                    style={selectedProject ? styles.repoPickerText : styles.repoPickerPlaceholder}
+                    numberOfLines={1}
+                  >
+                    {selectedProject ? selectedProject.name : "Choose a repository"}
+                  </Text>
+                  <Icon name="ChevronDown" size={14} color={theme.colors.foregroundMuted} />
+                </Pressable>
+              </View>
               {startWorkAvailability.status === "missing" ? (
                 <Text style={styles.startHint}>{startWorkAvailability.message}</Text>
+              ) : null}
+              {matchExplanation ? <Text style={styles.repoMatchHint}>{matchExplanation}</Text> : null}
+              {projectPickerOpen ? (
+                projectsQuery.isPending ? (
+                  <Text style={styles.muted}>Loading projects…</Text>
+                ) : projectsQuery.isError ? (
+                  <Text style={styles.error}>
+                    {projectsQuery.error instanceof Error ? projectsQuery.error.message : "Could not load projects"}
+                  </Text>
+                ) : projects.length === 0 ? (
+                  <Text style={styles.muted}>No projects found.</Text>
+                ) : (
+                  <ScrollView style={styles.repoProjectList}>
+                    {projects.map((project, index) => (
+                      <Pressable
+                        key={project.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Use ${project.name}`}
+                        onPress={() => {
+                          setManualProjectId(project.id);
+                          setProjectPickerOpen(false);
+                        }}
+                        style={[styles.repoProjectRow, index > 0 ? styles.repoProjectRowDivider : null]}
+                      >
+                        <Text style={styles.repoProjectName} numberOfLines={1}>
+                          {project.name}
+                        </Text>
+                        <Text style={styles.repoProjectPath} numberOfLines={1}>
+                          {project.rootPath}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                )
               ) : null}
               {columns.length > 0 ? (
                 <View>
