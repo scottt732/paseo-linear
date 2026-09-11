@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 import type { LinearTransport } from "./client";
-import { countPullRequests, fetchIssue, fetchTeams, listIssues, searchIssues, toIssue } from "./queries";
+import {
+  countPullRequests,
+  fetchIssue,
+  fetchLabelGroups,
+  fetchTeams,
+  listIssues,
+  searchIssues,
+  toIssue,
+} from "./queries";
 
 const rawIssue = {
   id: "uuid-1",
@@ -21,7 +29,7 @@ const rawIssue = {
   assignee: { id: "u1", name: "Stephanos Tsoucas" },
   project: { id: "p1", name: "Shopping", icon: "🎁", color: "#5e6ad2" },
   parent: { identifier: "ENG-14095", title: "Shop Tab", parent: null },
-  labels: { nodes: [{ name: "Backend", color: "#bb87fc" }] },
+  labels: { nodes: [{ name: "Backend", color: "#bb87fc", parent: null }] },
   attachments: { nodes: [] },
 };
 
@@ -54,7 +62,14 @@ describe("toIssue", () => {
     expect(toIssue({ ...rawIssue, parent: null }).parents).toEqual([]);
   });
   it("flattens label nodes", () => {
-    expect(toIssue(rawIssue).labels).toEqual([{ name: "Backend", color: "#bb87fc" }]);
+    expect(toIssue(rawIssue).labels).toEqual([{ name: "Backend", color: "#bb87fc", group: null }]);
+  });
+  it("maps a label's parent name to its group", () => {
+    const grouped = {
+      ...rawIssue,
+      labels: { nodes: [{ name: "cosmos-graphql", color: "#bb87fc", parent: { name: "Agent" } }] },
+    };
+    expect(toIssue(grouped).labels).toEqual([{ name: "cosmos-graphql", color: "#bb87fc", group: "Agent" }]);
   });
   it("derives prCount from attachment urls", () => {
     const withPr = {
@@ -156,5 +171,28 @@ describe("fetchTeams", () => {
     }));
     expect(await fetchTeams(transport)).toEqual([{ id: "t1", key: "ENG", name: "Engineering" }]);
     expect(calls[0].variables).toEqual({});
+  });
+});
+
+describe("fetchLabelGroups", () => {
+  it("returns the distinct, sorted set of non-null parent group names", async () => {
+    const { transport, calls } = stubTransport(() => ({
+      issueLabels: {
+        nodes: [
+          { parent: { name: "Team" } },
+          { parent: { name: "Agent" } },
+          { parent: { name: "Agent" } },
+          { parent: null },
+        ],
+      },
+    }));
+    expect(await fetchLabelGroups(transport)).toEqual(["Agent", "Team"]);
+    expect(calls[0].variables).toEqual({});
+  });
+  it("returns an empty list when no labels have a group", async () => {
+    const { transport } = stubTransport(() => ({
+      issueLabels: { nodes: [{ parent: null }, { parent: null }] },
+    }));
+    expect(await fetchLabelGroups(transport)).toEqual([]);
   });
 });

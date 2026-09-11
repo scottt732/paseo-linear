@@ -9,7 +9,7 @@ export const ISSUE_FIELDS = `
   assignee { id name }
   project { id name icon color }
   parent { identifier title parent { identifier title parent { identifier title } } }
-  labels { nodes { name color } }
+  labels { nodes { name color parent { name } } }
   attachments { nodes { url } }
 `;
 
@@ -51,7 +51,11 @@ const RawIssueSchema = z.object({
     })
     .nullable(),
   parent: ParentSchema.optional(),
-  labels: z.object({ nodes: z.array(z.object({ name: z.string(), color: z.string() })) }),
+  labels: z.object({
+    nodes: z.array(
+      z.object({ name: z.string(), color: z.string(), parent: z.object({ name: z.string() }).nullable() }),
+    ),
+  }),
   attachments: z.object({ nodes: z.array(z.object({ url: z.string() })) }),
 });
 
@@ -82,10 +86,19 @@ const STATES_QUERY = `query PaseoLinearStates($teamId: String!) {
   team(id: $teamId) { states { nodes { id name type position } } }
 }`;
 const TEAMS_QUERY = `query PaseoLinearTeams { teams(first: 100) { nodes { id key name } } }`;
+const LABEL_GROUPS_QUERY = `query PaseoLinearLabelGroups {
+  issueLabels(first: 250) { nodes { parent { name } } }
+}`;
 
 const TeamsSchema = z.object({
   teams: z.object({
     nodes: z.array(z.object({ id: z.string(), key: z.string(), name: z.string() })),
+  }),
+});
+
+const LabelGroupsSchema = z.object({
+  issueLabels: z.object({
+    nodes: z.array(z.object({ parent: z.object({ name: z.string() }).nullable() })),
   }),
 });
 
@@ -112,7 +125,11 @@ export function toIssue(raw: unknown): Issue {
   return IssueSchema.parse({
     ...parsed,
     parents: flattenParents(parsed.parent),
-    labels: parsed.labels.nodes,
+    labels: parsed.labels.nodes.map((label) => ({
+      name: label.name,
+      color: label.color,
+      group: label.parent?.name ?? null,
+    })),
     prCount: countPullRequests(parsed.attachments.nodes.map((node) => node.url)),
   });
 }
@@ -186,4 +203,13 @@ export async function fetchTeams(
 ): Promise<Array<{ id: string; key: string; name: string }>> {
   const data = await transport.request(TEAMS_QUERY, {}, TeamsSchema);
   return data.teams.nodes;
+}
+
+export async function fetchLabelGroups(transport: LinearTransport): Promise<string[]> {
+  const data = await transport.request(LABEL_GROUPS_QUERY, {}, LabelGroupsSchema);
+  const groups = new Set<string>();
+  for (const node of data.issueLabels.nodes) {
+    if (node.parent) groups.add(node.parent.name);
+  }
+  return [...groups].sort();
 }

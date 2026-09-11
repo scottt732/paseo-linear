@@ -28,7 +28,7 @@ export const IssueSchema = z.object({
     .object({ id: z.string(), name: z.string(), icon: z.string().nullable(), color: z.string().nullable() })
     .nullable(),
   parents: z.array(z.object({ identifier: z.string(), title: z.string() })),
-  labels: z.array(z.object({ name: z.string(), color: z.string() })),
+  labels: z.array(z.object({ name: z.string(), color: z.string(), group: z.string().nullable() })),
   prCount: z.number(),
 });
 

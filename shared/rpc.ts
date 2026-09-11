@@ -44,6 +44,12 @@ export const listTeamsRpc = defineRpc({
   output: z.object({ teams: z.array(z.object({ id: z.string(), key: z.string(), name: z.string() })) }),
 });
 
+export const listLabelGroupsRpc = defineRpc({
+  name: "linear.label-groups",
+  input: z.object({}),
+  output: z.object({ groups: z.array(z.string()) }),
+});
+
 export const verifyRpc = defineRpc({
   name: "linear.verify",
   input: z.object({}),

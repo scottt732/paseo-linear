@@ -19,7 +19,7 @@ const issue: Issue = {
   assignee: { id: "u1", name: "Stephanos Tsoucas" },
   project: { id: "p1", name: "Shopping", icon: "🎁", color: "#5e6ad2" },
   parents: [{ identifier: "ENG-14095", title: "Shop Tab" }],
-  labels: [{ name: "Backend", color: "#bb87fc" }],
+  labels: [{ name: "Backend", color: "#bb87fc", group: null }],
   prCount: 0,
 };
 
