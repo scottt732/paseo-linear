@@ -631,12 +631,14 @@ export function IssuesBoard({
       repoPickerText: { color: theme.colors.foreground, fontSize: 13 },
       repoPickerPlaceholder: { color: theme.colors.foregroundMuted, fontSize: 13 },
       repoMatchHint: { color: theme.colors.foregroundMuted, fontSize: 12, marginTop: -4 },
+      // Deliberately NOT its own scroller. Paseo's modal body already owns the
+      // vertical scroll, and a fixed-height nested vertical list competes with
+      // the sheet for gestures on Android. The list just extends the body.
       repoProjectList: {
         borderWidth: 1,
         borderColor: theme.colors.border,
         borderRadius: 8,
         marginTop: 4,
-        maxHeight: 200,
       },
       repoProjectRow: { paddingHorizontal: 10, paddingVertical: 8 },
       repoProjectRowDivider: { borderTopWidth: 1, borderTopColor: theme.colors.border },
@@ -896,7 +898,7 @@ export function IssuesBoard({
                 ) : projects.length === 0 ? (
                   <Text style={styles.muted}>No projects found.</Text>
                 ) : (
-                  <ScrollView style={styles.repoProjectList}>
+                  <View style={styles.repoProjectList}>
                     {projects.map((project, index) => (
                       <Pressable
                         key={project.id}
@@ -916,7 +918,7 @@ export function IssuesBoard({
                         </Text>
                       </Pressable>
                     ))}
-                  </ScrollView>
+                  </View>
                 )
               ) : null}
               {columns.length > 0 ? (
