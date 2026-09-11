@@ -19,19 +19,29 @@ paseo plugin reload linear
 
 ## What it does
 
-The plugin adds five things to Paseo:
+The plugin adds these to Paseo:
 
 - **Attach a Linear issue in the composer.** The attachment picker can search Linear and attach
   an issue's context to a message.
 - **Settings → Plugins → Linear.** Configure your API key, default team, provider, repository
   path, base ref, and prompt template. A connection test discloses which credential source is
   active.
-- **A Linear sidebar/workspace panel.** Assigned, Cycle, and Triage tabs, available from both
-  the sidebar and the workspace explorer.
-- **Start work on an issue.** From the Command Center ("Linear: start work on an issue"), the
-  `/linear ENG-123` slash command, or directly from the panel. Any of these creates a worktree
-  agent branched off the configured repository, with the issue's context as the agent's first
-  message.
+- **A Linear board**, in the sidebar and as a workspace tab. Four views — **Mine**, **Cycle**,
+  **Up for grabs** (unassigned), and **Triage** — each a horizontally-scrolling kanban board
+  grouped by workflow state, ordered by Linear's own state positions. Cards show the
+  identifier, parent, assignee, priority, estimate, project, labels, linked PR count, and due
+  date. The board is not a Linear replacement; it exists to answer "what am I working on" and
+  "what should I pick up next".
+- **Create an issue** from the `+` on any column header, pre-filled with that column's state.
+  Title, description, priority, due date, and team. It assigns to you on **Mine** and leaves
+  the issue unassigned on **Up for grabs**.
+- **Move an issue by dragging it.** Long-press a card to lift it, drag, and drop it on another
+  column; the target column highlights, and no highlight means releasing would do nothing.
+  Every card's detail view also has a **Move to…** list, which is the keyboard- and
+  screen-reader-reachable equivalent and the way to reach a column scrolled off-screen.
+- **Start work on an issue.** From the card, the Command Center ("Linear: start work on an
+  issue"), or the `/linear ENG-123` slash command. Any of these creates a worktree agent on
+  Linear's own suggested branch name, with the issue attached as its first context.
 - **A per-agent composer pill.** Any agent tagged with a `linear.issue` label
   gets a "Linear ENG-123" pill in its composer, with a menu to view the issue, open it in
   Linear, comment on it, move its state, or link the current branch. A turn-end offer row also
@@ -59,16 +69,22 @@ repository path). If you run Paseo headless, you must set `LINEAR_API_KEY` in th
 environment; the settings-screen key will not reach it. This is the one sharp edge in the
 design — do not assume the settings-screen key is enough for headless use.
 
-**A provider must be set.** Settings → Plugins → Linear has a "provider" field, and it must be
-filled in before "start work" will run. The Paseo SDK has no default-provider accessor, and the
-plugin deliberately does not guess one for you.
+**A provider must be set.** Settings → Plugins → Linear has a provider picker, populated from
+the providers your daemon reports as available, and it must be set before "start work" will
+run. There is no fallback: the Paseo SDK exposes no default-provider accessor, and the plugin
+deliberately will not pick a model for you and start an agent on it. A bare provider such as
+`claude` is valid; `provider/model` (for example `claude/claude-opus-5`) pins a model.
 
-**A repository path must be set.** Settings → Plugins → Linear also has a repository path
-field — the local checkout that the new worktree branches from — and "start work" refuses to
-run without it. The branch's base ref (`baseRef`) defaults to `origin/main` rather than local
-`main`, deliberately: Paseo fetches remote refs in the background, so `origin/main` reflects a
-recent remote state, while a local `main` branch can be stale if it hasn't been checked out or
-pulled recently.
+**A repository path, usually automatic.** This is the local checkout the new worktree branches
+from. When you open the Linear board as a tab inside a workspace, it defaults to that
+workspace's project root and you do not need to set anything. You only need to fill the field
+in Settings for the paths that have no workspace context: the sidebar surface, the `/linear`
+slash command, and the Command Center item. A value set in Settings always wins over the
+workspace default, so configuring it never gets silently overridden.
+
+The branch's base ref (`baseRef`) defaults to `origin/main` rather than local `main`,
+deliberately: Paseo fetches remote refs in the background, so `origin/main` reflects a recent
+remote state, while a local `main` can be stale if it has not been pulled recently.
 
 ## Launch from Linear
 
