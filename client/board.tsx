@@ -9,6 +9,7 @@ import type { Issue } from "../shared/issue";
 import { listIssuesRpc, listStatesRpc, moveStateRpc, startWorkRpc } from "../shared/rpc";
 import { linearSettings } from "../shared/settings";
 import { type DropEffect, columnAtPoint, dropEffect, resolveTargetStateId } from "./drag";
+import { resolveStartWorkAvailability } from "./start-work-state";
 import { LinearLogo } from "./logo";
 import { CreateIssueModal } from "./create-issue";
 import { IssueCard } from "./chip";
@@ -493,14 +494,19 @@ export function IssuesBoard({
   const now = useMemo(() => new Date(), []);
   const settingsState = useSettings(linearSettings);
 
-  // Settings still loading/unreadable is treated the same as "not configured": a
-  // conservative default that never enables a write the guard exists to prevent.
+  // Settings still loading is a transient, honest "don't know yet" — never
+  // report it as "not configured" (see resolveStartWorkAvailability). A
+  // resolved-but-unreadable document (error/invalid) falls back to the same
+  // conservative default as before: never enable a write the guard exists to
+  // prevent.
+  const settingsLoading = settingsState.status === "loading";
   const settingsValues = settingsState.status === "ready" ? settingsState.values : null;
   const missingProvider = !(settingsValues?.provider.trim());
   const effectiveRepositoryPath = settingsValues?.repositoryPath.trim() || repositoryPath?.trim() || "";
   const missingRepositoryPath = !effectiveRepositoryPath;
-  const canStartWork = !missingProvider && !missingRepositoryPath;
   const missingSettingMessage = missingStartWorkSetting(missingProvider, missingRepositoryPath);
+  const startWorkAvailability = resolveStartWorkAvailability(settingsLoading, missingSettingMessage);
+  const canStartWork = startWorkAvailability.status === "ready";
 
   const boardWrapRef = useRef<View>(null);
   const columnRefs = useRef(new Map<string, View>());
@@ -751,7 +757,9 @@ export function IssuesBoard({
                   Start work in a new worktree
                 </Text>
               </Pressable>
-              {missingSettingMessage ? <Text style={styles.startHint}>{missingSettingMessage}</Text> : null}
+              {startWorkAvailability.status === "missing" ? (
+                <Text style={styles.startHint}>{startWorkAvailability.message}</Text>
+              ) : null}
               {columns.length > 0 ? (
                 <View>
                   <Text style={styles.moveLabel}>Move to…</Text>
