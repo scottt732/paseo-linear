@@ -1,5 +1,36 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-*.log
-.DS_Store
+build/
+*.tsbuildinfo
+
+# Test output
+coverage/
+.vitest/
+
+# Local environment and credentials - never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Agent and editor scratch
 .notes/
+.claude/settings.local.json
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# OS junk
+.DS_Store
+Thumbs.db

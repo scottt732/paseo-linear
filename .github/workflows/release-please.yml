@@ -1,0 +1,33 @@
+name: release-please
+
+# Paseo installs a plugin from a Git ref, so there is nothing to publish: a tag and its
+# changelog are the whole release. release-please keeps both, driven by the conventional
+# commit subjects already used in this repository.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # A PR opened with the built-in GITHUB_TOKEN triggers no workflows, so the release
+      # PR would sit behind the required checks forever. RELEASE_PLEASE_TOKEN is a
+      # fine-grained PAT (contents + pull requests: read/write) whose PRs run CI like
+      # anyone else's; without it the job still runs, but the release PR gets no checks.
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

@@ -2,10 +2,17 @@
   "name": "paseo-linear",
   "private": true,
   "version": "0.0.0",
+  "description": "A Paseo plugin that turns a Linear issue into a Paseo worktree agent",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottt732/paseo-linear.git"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm test && ./scripts/check-plugin-contract.sh"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.8.0",

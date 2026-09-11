@@ -1,5 +1,7 @@
 # paseo-linear
 
+[![CI](https://github.com/scottt732/paseo-linear/actions/workflows/ci.yml/badge.svg)](https://github.com/scottt732/paseo-linear/actions/workflows/ci.yml)
+
 A Paseo plugin that integrates Paseo with [Linear](https://linear.app). It turns a Linear issue
 into a Paseo worktree agent — pull an issue's context into a workspace, start an agent working
 on it in a dedicated branch, and push comments, state changes, and branch links back to Linear
@@ -7,8 +9,21 @@ as you go.
 
 ## Installation
 
+Install it straight from this repository:
+
 ```bash
-paseo plugin install /Users/sholodak/cosmos/paseo-linear
+paseo plugin add scottt732/paseo-linear              # tracks the default branch
+paseo plugin add scottt732/paseo-linear --ref v0.1.0 # pins a released tag
+```
+
+The plugin needs no build step: every module it imports (`@getpaseo/plugin`, `react`,
+`react-native`, `@tanstack/react-query`, `zod`) is supplied by the Paseo host at runtime, so the
+manifest declares no `build` commands and the checkout installs as-is.
+
+To work on it locally, install from the checkout's absolute path instead:
+
+```bash
+paseo plugin install /absolute/path/to/paseo-linear
 ```
 
 After editing the plugin source, reload it for the changes to take effect:
@@ -16,6 +31,10 @@ After editing the plugin source, reload it for the changes to take effect:
 ```bash
 paseo plugin reload linear
 ```
+
+**Before you install, read the source.** Paseo plugins are trusted, unsandboxed code: everything
+under `server/` runs in a subprocess of your daemon with your user's access, and everything under
+`client/` runs inside the Paseo app. See [SECURITY.md](SECURITY.md).
 
 ## What it does
 
@@ -116,7 +135,7 @@ launch it from an issue with the `Cmd Option .` keyboard shortcut.
 
 Because GUI-launched processes on macOS often do not inherit a login shell's `PATH`, the script
 calls `paseo` assuming it resolves; if it doesn't in your environment, edit the script to call
-the absolute path, `/Users/sholodak/.local/bin/paseo`, instead.
+the absolute path — typically `~/.local/bin/paseo`, as `command -v paseo` reports it — instead.
 
 ### Note on the `paseo://` URL scheme
 
@@ -127,8 +146,16 @@ way to open a Linear issue into Paseo today.
 ## Development
 
 ```bash
+npm install
+npm run check   # typecheck, tests, and the plugin-contract checks below
+```
+
+Or run the pieces individually:
+
+```bash
 npm run typecheck
 npm test
+./scripts/check-plugin-contract.sh
 ```
 
 Client code (everything under `client/`) has no unit tests by design — there's no React Native
@@ -137,9 +164,44 @@ changes are instead gated on typecheck and a "mobile audit": a grep that flags a
 or JSX-shaped syntax slipping into React Native code, since this plugin's client surfaces render
 on mobile as well as desktop.
 
-```bash
-rg -n "document\.|window\.|localStorage|navigator\.|<(div|span|button|a|p|ul|li|input|form|img|h[1-6])[ >/]|className=|onClick=" client/
-```
+`scripts/check-plugin-contract.sh` runs that audit, allowing the one legitimate match — the
+`window.open` call in `client/web.ts`, which is guarded to only run on web. The same script also
+checks what `tsc` and vitest cannot see: that `paseo-plugin.json` declares a valid `id` and
+`requirements.paseo`, that the plugin root holds nothing but its two entries, that client and
+shared code imports no `server/` module and no `node:` builtin (and the reverse for server code),
+that `tsconfig.json` never pulls in the DOM lib, and that no `.env` file is tracked.
 
-This should report exactly one match: the `window.open` call in `client/web.ts`, which is
-guarded to only run on web.
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull
+request:
+
+- **verify** — `npm ci`, `npm run typecheck`, `npm test` on Node 22 and 24.
+- **contract** — `scripts/check-plugin-contract.sh`.
+- **secrets** — gitleaks over the full history. Also enable GitHub secret scanning and push
+  protection on the repository; they catch a key before the push lands, which CI cannot.
+
+## Releases
+
+There is no deploy step and nothing to publish: Paseo installs the plugin from a Git ref, so a tag
+and its changelog *are* the release.
+
+[release-please](https://github.com/googleapis/release-please) maintains both from the conventional
+commit subjects this repository already uses (`feat:`, `fix:`, `docs:`, `refactor:`, …). On every
+push to `main` it opens or updates a "chore(main): release X.Y.Z" pull request holding the version
+bump and the `CHANGELOG.md` entries. Merging that PR tags the commit and publishes the GitHub
+release; nothing is tagged by hand.
+
+So: `--ref main` tracks the branch and ignores releases entirely, while `--ref v0.1.0` pins a tag
+whose contents are described in the changelog. The version number itself is cosmetic — Paseo reads
+`paseo-plugin.json`, which carries no version — so the changelog is the part that earns its keep.
+
+Two repository settings this needs: **Allow GitHub Actions to create and approve pull requests**
+(Settings → Actions → General), and ideally a `RELEASE_PLEASE_TOKEN` secret holding a fine-grained
+PAT with contents + pull requests read/write. Without the PAT the release PR is still opened, but
+it gets no CI runs, because pull requests opened with the built-in `GITHUB_TOKEN` trigger no
+workflows.
+
+## License
+
+[MIT](LICENSE).

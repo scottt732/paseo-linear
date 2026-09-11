@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+package-lock.json linguist-generated=true -diff
+docs/** linguist-documentation=true
+
+bin/paseo-linear-open text eol=lf
