@@ -90,5 +90,7 @@ export function registerHandlers(server: PluginServerContext): void {
     return { teams: await fetchTeams(transport) };
   });
 
-  server.handle(startWorkRpc, ({ identifier }, context) => startWork(context, identifier));
+  server.handle(startWorkRpc, ({ identifier, repositoryPath }, context) =>
+    startWork(context, identifier, repositoryPath),
+  );
 }

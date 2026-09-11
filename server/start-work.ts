@@ -6,13 +6,24 @@ import { loadLinearContext } from "./context";
 import { fetchIssue } from "./linear/queries";
 
 export interface StartWorkSettings {
-  repositoryPath: string;
   baseRef: string;
   promptTemplate: string;
 }
 
-export function buildWorkspaceRequest(issue: Issue, settings: StartWorkSettings) {
-  const cwd = settings.repositoryPath.trim();
+/**
+ * A setting explicitly configured in Settings → Plugins → Linear always wins over
+ * a caller-supplied override (e.g. the current workspace's project root) — never let
+ * a caller silently redirect work to a different checkout. The override is used only
+ * when the setting is empty.
+ */
+export function resolveRepositoryPath(settingValue: string, override?: string): string {
+  const configured = settingValue.trim();
+  if (configured) return configured;
+  return (override ?? "").trim();
+}
+
+export function buildWorkspaceRequest(issue: Issue, repositoryPath: string, settings: StartWorkSettings) {
+  const cwd = repositoryPath.trim();
   if (!cwd) {
     throw new Error(
       "Set a repository path in Settings → Plugins → Linear before starting work from an issue",
@@ -59,6 +70,7 @@ export function buildWorkspaceRequest(issue: Issue, settings: StartWorkSettings)
 export async function startWork(
   context: PluginHandlerContext,
   identifier: string,
+  repositoryPathOverride?: string,
 ): Promise<{ workspaceId: string; agentId: string; branchName: string }> {
   const { transport, settings } = loadLinearContext(context);
   const issue = await fetchIssue(transport, identifier);
@@ -71,7 +83,8 @@ export async function startWork(
     );
   }
 
-  const request = buildWorkspaceRequest(issue, settings);
+  const repositoryPath = resolveRepositoryPath(settings.repositoryPath, repositoryPathOverride);
+  const request = buildWorkspaceRequest(issue, repositoryPath, settings);
   const workspace = await context.paseo.workspaces.create(request);
   const agent = await workspace.agents.create({
     config: { provider },

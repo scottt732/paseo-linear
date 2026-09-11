@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Issue } from "../shared/issue";
 import { DEFAULT_PROMPT_TEMPLATE } from "../shared/format";
-import { buildWorkspaceRequest } from "./start-work";
+import { buildWorkspaceRequest, resolveRepositoryPath } from "./start-work";
 
 const issue: Issue = {
   id: "uuid-1",
@@ -26,14 +26,15 @@ const issue: Issue = {
 };
 
 const settings = {
-  repositoryPath: "/Users/me/code/app",
   baseRef: "origin/main",
   promptTemplate: DEFAULT_PROMPT_TEMPLATE,
 };
 
+const repositoryPath = "/Users/me/code/app";
+
 describe("buildWorkspaceRequest", () => {
   it("uses the verified worktree branch-off shape", () => {
-    expect(buildWorkspaceRequest(issue, settings).source).toEqual({
+    expect(buildWorkspaceRequest(issue, repositoryPath, settings).source).toEqual({
       kind: "worktree",
       cwd: "/Users/me/code/app",
       action: "branch-off",
@@ -43,17 +44,19 @@ describe("buildWorkspaceRequest", () => {
   });
 
   it("titles the workspace with the identifier and title", () => {
-    expect(buildWorkspaceRequest(issue, settings).title).toBe("ENG-14236 · Randomize the products");
+    expect(buildWorkspaceRequest(issue, repositoryPath, settings).title).toBe(
+      "ENG-14236 · Randomize the products",
+    );
   });
 
   it("renders the prompt from the template", () => {
-    const prompt = buildWorkspaceRequest(issue, settings).firstAgentContext?.prompt;
+    const prompt = buildWorkspaceRequest(issue, repositoryPath, settings).firstAgentContext?.prompt;
     expect(prompt).toContain("ENG-14236: Randomize the products");
     expect(prompt).toContain("Shuffle daily.");
   });
 
   it("seeds the issue as an external-resource attachment", () => {
-    const attachments = buildWorkspaceRequest(issue, settings).firstAgentContext?.attachments;
+    const attachments = buildWorkspaceRequest(issue, repositoryPath, settings).firstAgentContext?.attachments;
     expect(attachments?.[0]).toMatchObject({
       type: "text",
       mimeType: "text/plain",
@@ -67,8 +70,30 @@ describe("buildWorkspaceRequest", () => {
   });
 
   it("throws a clear error when no repository path is configured", () => {
-    expect(() => buildWorkspaceRequest(issue, { ...settings, repositoryPath: "" })).toThrow(
-      "repository path",
+    expect(() => buildWorkspaceRequest(issue, "", settings)).toThrow("repository path");
+  });
+});
+
+describe("resolveRepositoryPath", () => {
+  it("uses the configured setting even when an override is also given", () => {
+    expect(resolveRepositoryPath("/Users/me/code/app", "/Users/me/code/other")).toBe(
+      "/Users/me/code/app",
     );
+  });
+
+  it("falls back to the override only when the setting is empty", () => {
+    expect(resolveRepositoryPath("", "/Users/me/code/other")).toBe("/Users/me/code/other");
+  });
+
+  it("falls back to the override when the setting is only whitespace", () => {
+    expect(resolveRepositoryPath("   ", "/Users/me/code/other")).toBe("/Users/me/code/other");
+  });
+
+  it("returns an empty string when neither the setting nor an override is given", () => {
+    expect(resolveRepositoryPath("", undefined)).toBe("");
+  });
+
+  it("trims a configured setting", () => {
+    expect(resolveRepositoryPath("  /Users/me/code/app  ", undefined)).toBe("/Users/me/code/app");
   });
 });

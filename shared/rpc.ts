@@ -60,7 +60,7 @@ export const listStatesRpc = defineRpc({
 
 export const startWorkRpc = defineRpc({
   name: "linear.start-work",
-  input: IdentifierInput,
+  input: IdentifierInput.extend({ repositoryPath: z.string().optional() }),
   output: z.object({ workspaceId: z.string(), agentId: z.string(), branchName: z.string() }),
 });
 
