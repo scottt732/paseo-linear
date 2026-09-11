@@ -1,5 +1,5 @@
 import type { PluginTheme } from "@getpaseo/plugin";
-import { type PluginSurfaceProps, useRpc } from "@getpaseo/plugin/client";
+import { type PluginSurfaceProps, useRpc, useSettings } from "@getpaseo/plugin/client";
 import { FlatList, Icon, Modal, ScrollView, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -7,6 +7,7 @@ import { Animated, PanResponder, Pressable, Text, View } from "react-native";
 import { relativeTime } from "../shared/format";
 import type { Issue } from "../shared/issue";
 import { listIssuesRpc, listStatesRpc, moveStateRpc, startWorkRpc } from "../shared/rpc";
+import { linearSettings } from "../shared/settings";
 import { type DropEffect, columnAtPoint, dropEffect, resolveTargetStateId } from "./drag";
 import { LinearLogo } from "./logo";
 import { CreateIssueModal } from "./create-issue";
@@ -67,6 +68,21 @@ function buildColumns(issues: Issue[]): Column[] {
     }
   }
   return Array.from(byName.values()).sort((a, b) => a.minPosition - b.minPosition);
+}
+
+/**
+ * Names exactly what is missing before "Start work in a new worktree" can run,
+ * so the user learns it by reading the card instead of by pressing the button
+ * and getting a failure toast. The server-side guards in server/start-work.ts
+ * stay the source of truth; this is a second, earlier layer of discoverability.
+ */
+function missingStartWorkSetting(missingProvider: boolean, missingRepositoryPath: boolean): string | null {
+  if (missingProvider && missingRepositoryPath) {
+    return "Set a provider and a repository path in Settings → Plugins → Linear";
+  }
+  if (missingProvider) return "Set a provider in Settings → Plugins → Linear";
+  if (missingRepositoryPath) return "Set a repository path in Settings → Plugins → Linear";
+  return null;
 }
 
 function initials(name: string): string {
@@ -452,7 +468,15 @@ function BoardColumn({
   );
 }
 
-export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: PluginLayout }) {
+export function IssuesBoard({
+  theme,
+  layout,
+  repositoryPath,
+}: {
+  theme: PluginTheme;
+  layout: PluginLayout;
+  repositoryPath?: string;
+}) {
   const [scope, setScope] = useState<Scope>("assigned");
   const [selected, setSelected] = useState<Issue | null>(null);
   const [createFor, setCreateFor] = useState<string | null>(null);
@@ -467,6 +491,16 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
   const toast = useToast();
   const { pending, offer, dismiss } = useLaunchFollowUp();
   const now = useMemo(() => new Date(), []);
+  const settingsState = useSettings(linearSettings);
+
+  // Settings still loading/unreadable is treated the same as "not configured": a
+  // conservative default that never enables a write the guard exists to prevent.
+  const settingsValues = settingsState.status === "ready" ? settingsState.values : null;
+  const missingProvider = !(settingsValues?.provider.trim());
+  const effectiveRepositoryPath = settingsValues?.repositoryPath.trim() || repositoryPath?.trim() || "";
+  const missingRepositoryPath = !effectiveRepositoryPath;
+  const canStartWork = !missingProvider && !missingRepositoryPath;
+  const missingSettingMessage = missingStartWorkSetting(missingProvider, missingRepositoryPath);
 
   const boardWrapRef = useRef<View>(null);
   const columnRefs = useRef(new Map<string, View>());
@@ -517,6 +551,8 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
       board: { flex: 1 },
       boardContent: { flexDirection: "row" as const, paddingBottom: 8 },
       start: { color: theme.colors.accent, fontSize: 13, paddingVertical: 8 },
+      startDisabled: { color: theme.colors.foregroundMuted, fontSize: 13, paddingVertical: 8 },
+      startHint: { color: theme.colors.foregroundMuted, fontSize: 12, marginTop: -4 },
       moveLabel: { color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "600" as const, marginTop: 4 },
       moveRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, paddingVertical: 8 },
       moveDot: { width: 8, height: 8, borderRadius: 4 },
@@ -611,7 +647,7 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
 
   async function begin(issue: Issue) {
     try {
-      const result = await startWork({ identifier: issue.identifier });
+      const result = await startWork({ identifier: issue.identifier, repositoryPath });
       toast.show(`Started ${issue.identifier} on ${result.branchName}`, { variant: "success" });
       setSelected(null);
       offer(issue);
@@ -704,9 +740,18 @@ export function IssuesBoard({ theme, layout }: { theme: PluginTheme; layout: Plu
           {selected ? (
             <View style={{ gap: layout.compact ? 8 : 12 }}>
               <IssueCard issue={selected} theme={theme} layout={layout} />
-              <Pressable accessibilityRole="button" onPress={() => void begin(selected)}>
-                <Text style={styles.start}>Start work in a new worktree</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canStartWork }}
+                onPress={() => {
+                  if (canStartWork) void begin(selected);
+                }}
+              >
+                <Text style={canStartWork ? styles.start : styles.startDisabled}>
+                  Start work in a new worktree
+                </Text>
               </Pressable>
+              {missingSettingMessage ? <Text style={styles.startHint}>{missingSettingMessage}</Text> : null}
               {columns.length > 0 ? (
                 <View>
                   <Text style={styles.moveLabel}>Move to…</Text>
