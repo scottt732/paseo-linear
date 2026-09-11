@@ -4,18 +4,18 @@ import type { RepoMatch } from "./repo-match";
 
 describe("explainRepoMatch", () => {
   it("explains a remembered match by naming the label", () => {
-    const match: RepoMatch = { repoLabel: "cosmos-graphql", project: null, reason: "remembered" };
-    expect(explainRepoMatch(match)).toBe("Last used for cosmos-graphql");
+    const match: RepoMatch = { repoLabel: "web-api", project: null, reason: "remembered" };
+    expect(explainRepoMatch(match)).toBe("Last used for web-api");
   });
 
   it("explains a unique label match by naming the label", () => {
-    const match: RepoMatch = { repoLabel: "cosmos-graphql", project: null, reason: "unique-label-match" };
-    expect(explainRepoMatch(match)).toBe("Matched cosmos-graphql");
+    const match: RepoMatch = { repoLabel: "web-api", project: null, reason: "unique-label-match" };
+    expect(explainRepoMatch(match)).toBe("Matched web-api");
   });
 
   it("explains an ambiguous match by naming the label and asking the user to choose", () => {
-    const match: RepoMatch = { repoLabel: "cosmos-graphql", project: null, reason: "ambiguous" };
-    expect(explainRepoMatch(match)).toBe("Several projects named cosmos-graphql — choose one");
+    const match: RepoMatch = { repoLabel: "web-api", project: null, reason: "ambiguous" };
+    expect(explainRepoMatch(match)).toBe("Several projects named web-api — choose one");
   });
 
   it("explains a last-used match without naming any label", () => {

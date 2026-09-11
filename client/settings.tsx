@@ -184,7 +184,7 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
           {labelGroupFieldUsable ? (
             <SettingsSelect
               label="Repository label group"
-              hint="Names which Linear label group identifies the repository, e.g. Agent for labels like Agent/cosmos-graphql. Used to preselect the repository when starting work from an issue. None disables label matching."
+              hint="Names which Linear label group identifies the repository, e.g. Agent for labels like Agent/web-api. Used to preselect the repository when starting work from an issue. None disables label matching."
               value={draft.repoLabelGroup ?? values.repoLabelGroup}
               options={labelGroupOptions}
               onValueChange={(value) => setDraft((d) => ({ ...d, repoLabelGroup: value }))}
@@ -192,7 +192,7 @@ export function LinearSettingsScreen({ theme }: PluginSurfaceProps) {
           ) : (
             <SettingsInput
               label="Repository label group"
-              hint="Names which Linear label group identifies the repository, e.g. Agent for labels like Agent/cosmos-graphql. Used to preselect the repository when starting work from an issue. Leave empty to disable label matching. Could not load the list of label groups from Linear, so this is a free-text field for now."
+              hint="Names which Linear label group identifies the repository, e.g. Agent for labels like Agent/web-api. Used to preselect the repository when starting work from an issue. Leave empty to disable label matching. Could not load the list of label groups from Linear, so this is a free-text field for now."
               initialValue={values.repoLabelGroup}
               placeholder="Agent"
               onChangeText={(text) => setDraft((d) => ({ ...d, repoLabelGroup: text }))}

@@ -65,7 +65,7 @@ describe("createIssue", () => {
     const { transport, calls } = stub({
       issueCreate: {
         success: true,
-        issue: { id: "issue-9", identifier: "ENG-9", url: "https://linear.app/thecosmos/issue/ENG-9" },
+        issue: { id: "issue-9", identifier: "ENG-9", url: "https://linear.app/acme/issue/ENG-9" },
       },
     });
     expect(
@@ -80,7 +80,7 @@ describe("createIssue", () => {
       }),
     ).toEqual({
       identifier: "ENG-9",
-      url: "https://linear.app/thecosmos/issue/ENG-9",
+      url: "https://linear.app/acme/issue/ENG-9",
       id: "issue-9",
     });
     expect(calls[0].variables).toEqual({
@@ -100,7 +100,7 @@ describe("createIssue", () => {
     const { transport, calls } = stub({
       issueCreate: {
         success: true,
-        issue: { id: "issue-9", identifier: "ENG-9", url: "https://linear.app/thecosmos/issue/ENG-9" },
+        issue: { id: "issue-9", identifier: "ENG-9", url: "https://linear.app/acme/issue/ENG-9" },
       },
     });
     await createIssue(transport, { title: "New issue", teamId: "team-1" });

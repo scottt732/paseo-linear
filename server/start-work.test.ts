@@ -8,7 +8,7 @@ const issue: Issue = {
   identifier: "ENG-14236",
   title: "Randomize the products",
   description: "Shuffle daily.",
-  url: "https://linear.app/thecosmos/issue/ENG-14236/randomize",
+  url: "https://linear.app/acme/issue/ENG-14236/randomize",
   branchName: "feature/eng-14236-randomize",
   priorityLabel: "No priority",
   priority: 0,

@@ -131,7 +131,7 @@ Expected: both PASS. If `tsc` reports that `vitest/config` types are missing, ad
 
 `README.md` states: what the plugin does (one paragraph), that it needs a Linear personal API
 key set either as `LINEAR_API_KEY` in the daemon environment or in Settings → Plugins → Linear,
-the install command `paseo plugin install /Users/sholodak/cosmos/paseo-linear`, and that source
+the install command `paseo plugin install /home/dev/src/paseo-linear`, and that source
 edits require `paseo plugin reload linear`.
 
 - [ ] **Step 7: Commit**
@@ -321,7 +321,7 @@ const issue: Issue = {
   identifier: "ENG-14236",
   title: "Randomize the products on the tabs & Brands pages",
   description: "Shuffle daily.",
-  url: "https://linear.app/thecosmos/issue/ENG-14236/randomize",
+  url: "https://linear.app/acme/issue/ENG-14236/randomize",
   branchName: "feature/eng-14236-randomize",
   priorityLabel: "No priority",
   createdAt: "2026-09-09T14:40:17.035Z",
@@ -902,7 +902,7 @@ const rawIssue = {
   identifier: "ENG-14236",
   title: "Randomize the products",
   description: "Shuffle daily.",
-  url: "https://linear.app/thecosmos/issue/ENG-14236/randomize",
+  url: "https://linear.app/acme/issue/ENG-14236/randomize",
   branchName: "feature/eng-14236-randomize",
   priorityLabel: "No priority",
   createdAt: "2026-09-09T14:40:17.035Z",
@@ -1894,7 +1894,7 @@ needed. Delete `pushSettingsValues` if the direct call reads better.
 
 ```bash
 npm run typecheck && npm test
-paseo plugin install /Users/sholodak/cosmos/paseo-linear
+paseo plugin install /home/dev/src/paseo-linear
 paseo plugin ls
 ```
 
@@ -2347,7 +2347,7 @@ const issue: Issue = {
   identifier: "ENG-14236",
   title: "Randomize the products",
   description: "Shuffle daily.",
-  url: "https://linear.app/thecosmos/issue/ENG-14236/randomize",
+  url: "https://linear.app/acme/issue/ENG-14236/randomize",
   branchName: "feature/eng-14236-randomize",
   priorityLabel: "No priority",
   createdAt: "2026-09-09T14:40:17.035Z",
@@ -3181,7 +3181,7 @@ chmod +x bin/paseo-linear-open
 Run: `./bin/paseo-linear-open ENG-14236`
 Expected: an agent is created with the label set. Confirm with `paseo ls --json`. If your
 `paseo` is not on `PATH` for GUI-launched processes, note the absolute path
-`/Users/sholodak/.local/bin/paseo` in the README rather than assuming `PATH`.
+`/home/dev/.local/bin/paseo` in the README rather than assuming `PATH`.
 
 - [ ] **Step 3: Document setup in the README**
 

@@ -1,26 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { matchProject, repoLabelFromIssue, type ProjectRef } from "./repo-match";
 
-const cosmosGraphqlScripts: ProjectRef = {
-  id: "remote:github.com/Cosmos-Entity/cosmos-graphql",
-  name: "cosmos-graphql",
-  rootPath: "/Users/sholodak/cosmos/cosmos-graphql/scripts",
+const webApiScripts: ProjectRef = {
+  id: "remote:github.com/acme-co/web-api",
+  name: "web-api",
+  rootPath: "/home/dev/src/web-api/scripts",
 };
-const cosmosGraphqlRoot: ProjectRef = {
+const webApiRoot: ProjectRef = {
   id: "prj_2da46a36603f00d8",
-  name: "cosmos-graphql",
-  rootPath: "/Users/sholodak/cosmos/cosmos-graphql",
+  name: "web-api",
+  rootPath: "/home/dev/src/web-api",
 };
 const paseoLinear: ProjectRef = {
   id: "prj_paseolinear",
   name: "paseo-linear",
-  rootPath: "/Users/sholodak/cosmos/paseo-linear",
+  rootPath: "/home/dev/src/paseo-linear",
 };
 
 describe("repoLabelFromIssue", () => {
   it("returns the name of the label in the configured group", () => {
-    const labels = [{ name: "cosmos-graphql", group: "Agent" }];
-    expect(repoLabelFromIssue(labels, "Agent")).toBe("cosmos-graphql");
+    const labels = [{ name: "web-api", group: "Agent" }];
+    expect(repoLabelFromIssue(labels, "Agent")).toBe("web-api");
   });
 
   it("returns null when there is no label in the configured group", () => {
@@ -35,33 +35,33 @@ describe("repoLabelFromIssue", () => {
   it("picks the label in the configured group among several", () => {
     const labels = [
       { name: "Product", group: "Team" },
-      { name: "cosmos-graphql", group: "Agent" },
+      { name: "web-api", group: "Agent" },
       { name: "High", group: "⭐️ Benefit" },
     ];
-    expect(repoLabelFromIssue(labels, "Agent")).toBe("cosmos-graphql");
+    expect(repoLabelFromIssue(labels, "Agent")).toBe("web-api");
   });
 
   it("matches the group exactly and case-sensitively", () => {
-    const labels = [{ name: "cosmos-graphql", group: "agent" }];
+    const labels = [{ name: "web-api", group: "agent" }];
     expect(repoLabelFromIssue(labels, "Agent")).toBeNull();
   });
 
   it("ignores labels with no group at all", () => {
-    const labels = [{ name: "cosmos-graphql", group: null }];
+    const labels = [{ name: "web-api", group: null }];
     expect(repoLabelFromIssue(labels, "Agent")).toBeNull();
   });
 
   it("returns null when repoLabelGroup is empty", () => {
-    const labels = [{ name: "cosmos-graphql", group: "Agent" }];
+    const labels = [{ name: "web-api", group: "Agent" }];
     expect(repoLabelFromIssue(labels, "")).toBeNull();
   });
 });
 
 describe("matchProject", () => {
   const baseOptions = {
-    labels: [{ name: "cosmos-graphql", group: "Agent" }],
+    labels: [{ name: "web-api", group: "Agent" }],
     repoLabelGroup: "Agent",
-    projects: [cosmosGraphqlScripts, cosmosGraphqlRoot, paseoLinear] as ReadonlyArray<ProjectRef>,
+    projects: [webApiScripts, webApiRoot, paseoLinear] as ReadonlyArray<ProjectRef>,
     projectByRepoLabel: {},
     lastProjectId: "",
   };
@@ -70,12 +70,12 @@ describe("matchProject", () => {
     const result = matchProject({
       ...baseOptions,
       labels: [{ name: "paseo-linear", group: "Agent" }],
-      projects: [paseoLinear, cosmosGraphqlRoot],
-      projectByRepoLabel: { "paseo-linear": cosmosGraphqlRoot.id },
+      projects: [paseoLinear, webApiRoot],
+      projectByRepoLabel: { "paseo-linear": webApiRoot.id },
     });
     expect(result).toEqual({
       repoLabel: "paseo-linear",
-      project: cosmosGraphqlRoot,
+      project: webApiRoot,
       reason: "remembered",
     });
   });
@@ -98,7 +98,7 @@ describe("matchProject", () => {
     const result = matchProject({
       ...baseOptions,
       labels: [{ name: "paseo-linear", group: "Agent" }],
-      projects: [paseoLinear, cosmosGraphqlRoot],
+      projects: [paseoLinear, webApiRoot],
     });
     expect(result).toEqual({
       repoLabel: "paseo-linear",
@@ -110,7 +110,7 @@ describe("matchProject", () => {
   it("returns ambiguous with a null project when two projects share the label's name", () => {
     const result = matchProject(baseOptions);
     expect(result).toEqual({
-      repoLabel: "cosmos-graphql",
+      repoLabel: "web-api",
       project: null,
       reason: "ambiguous",
     });

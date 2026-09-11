@@ -197,7 +197,7 @@ vault. The settings screen says so next to the key input, and the input uses
 labels: {
   "linear.issue":   "ENG-14236",
   "linear.issueId": "f92cd857-…",
-  "linear.url":     "https://linear.app/thecosmos/issue/ENG-14236/…",
+  "linear.url":     "https://linear.app/acme/issue/ENG-14236/…",
 }
 ```
 

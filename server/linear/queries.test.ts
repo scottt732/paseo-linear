@@ -16,7 +16,7 @@ const rawIssue = {
   identifier: "ENG-14236",
   title: "Randomize the products",
   description: "Shuffle daily.",
-  url: "https://linear.app/thecosmos/issue/ENG-14236/randomize",
+  url: "https://linear.app/acme/issue/ENG-14236/randomize",
   branchName: "feature/eng-14236-randomize",
   priorityLabel: "No priority",
   priority: 0,
@@ -67,9 +67,9 @@ describe("toIssue", () => {
   it("maps a label's parent name to its group", () => {
     const grouped = {
       ...rawIssue,
-      labels: { nodes: [{ name: "cosmos-graphql", color: "#bb87fc", parent: { name: "Agent" } }] },
+      labels: { nodes: [{ name: "web-api", color: "#bb87fc", parent: { name: "Agent" } }] },
     };
-    expect(toIssue(grouped).labels).toEqual([{ name: "cosmos-graphql", color: "#bb87fc", group: "Agent" }]);
+    expect(toIssue(grouped).labels).toEqual([{ name: "web-api", color: "#bb87fc", group: "Agent" }]);
   });
   it("derives prCount from attachment urls", () => {
     const withPr = {
@@ -91,7 +91,7 @@ describe("countPullRequests", () => {
     expect(countPullRequests(["https://github.com/acme/repo/issues/9"])).toBe(0);
   });
   it("does not count a document URL", () => {
-    expect(countPullRequests(["https://linear.app/thecosmos/document/abc"])).toBe(0);
+    expect(countPullRequests(["https://linear.app/acme/document/abc"])).toBe(0);
   });
   it("returns 0 for an empty list", () => {
     expect(countPullRequests([])).toBe(0);
