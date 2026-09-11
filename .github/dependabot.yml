@@ -8,6 +8,17 @@ updates:
     groups:
       dev-dependencies:
         patterns: ["*"]
+    # react, react-native, @types/react, @tanstack/react-query and @getpaseo/plugin are
+    # supplied by the Paseo host at runtime. Their versions must mirror the host the
+    # plugin runs on rather than track the newest release: @getpaseo/plugin@0.8.0
+    # peer-requires react ~19.1.0, so bumping react only yields a lockfile npm ci
+    # cannot resolve. Bump these deliberately, alongside requirements.paseo.
+    ignore:
+      - dependency-name: "react"
+      - dependency-name: "react-native"
+      - dependency-name: "@types/react"
+      - dependency-name: "@tanstack/react-query"
+      - dependency-name: "@getpaseo/plugin"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
